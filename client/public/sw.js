@@ -1,4 +1,5 @@
-const CACHE_NAME = 'mira-v1';
+// Cache version — bump this string whenever you deploy to force all clients to get fresh code.
+const CACHE_NAME = 'mira-v3';
 const APP_SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -23,6 +24,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Navigation requests: always try network first so users always get the latest HTML.
+  // Fall back to cache only when completely offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -31,23 +34,21 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match('/') ?? fetch(request)),
     );
     return;
   }
 
+  // Static assets (JS/CSS/images): network-first with cache fallback.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === 'basic') {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    }),
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request).then((cached) => cached ?? Response.error())),
   );
 });
