@@ -1,0 +1,35 @@
+<svg width="192" height="192" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#f7c948" />
+      <stop offset="100%" stopColor="#d4a017" />
+    </linearGradient>
+    <linearGradient id="pink" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#e91e63" />
+      <stop offset="100%" stopColor="#880e4f" />
+    </linearGradient>
+    <radialGradient id="centerGrad" cx="60%" cy="60%" r="50%">
+      <stop offset="0%" stopColor="#ffd1e5" />
+      <stop offset="100%" stopColor="#c2185b" />
+    </radialGradient>
+  </defs>
+
+  <!-- Outer circular frame -->
+  <circle cx="60" cy="60" r="54" fill="none" stroke="url(#gold)" strokeWidth="5" />
+
+  <!-- Five petals (small circles) arranged in a floral pattern -->
+  <g fill="url(#pink)" stroke="url(#gold)" strokeWidth="2">
+    <circle cx="60" cy="36" r="14" />
+    <circle cx="80.9" cy="53.2" r="13.5" />
+    <circle cx="72.9" cy="77.8" r="14" />
+    <circle cx="47.1" cy="77.8" r="14" />
+    <circle cx="39.1" cy="53.2" r="13.5" />
+  </g>
+
+  <!-- Center golden dot -->
+  <circle cx="60" cy="60" r="10" fill="url(#centerGrad)" />
+  <circle cx="56" cy="56" r="3" fill="#ffffff" opacity="0.55" />
+
+  <!-- Tiny accent dot at top -->
+  <circle cx="60" cy="12" r="2.5" fill="url(#gold)" />
+</svg>

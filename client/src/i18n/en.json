@@ -1,0 +1,69 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "add": "Add",
+    "actions": "Actions",
+    "confirm": "Confirm"
+  },
+"login": {
+    "title": "Sign In",
+    "subtitle": "Mira — Salon Management System",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign In",
+    "error": "Invalid username or password"
+  },
+  "menu": {
+    "dashboard": "Dashboard",
+    "clients": "Clients",
+    "appointments": "Appointments",
+    "services": "Services",
+    "employees": "Employees",
+    "inventory": "Inventory",
+    "accounting": "Accounting",
+    "reports": "Reports",
+    "pos": "Quick POS",
+    "offers": "Offers",
+    "memberships": "Memberships & Plans",
+    "giftcards": "Gift Cards",
+    "campaigns": "Marketing Campaigns",
+    "notifications": "Notifications",
+    "suppliers": "Suppliers",
+    "purchases": "Purchase Orders",
+    "attendance": "Attendance",
+    "users": "Users",
+    "branches": "Branches",
+    "settings": "Settings",
+    "logout": "Logout",
+    "language": "Language"
+  },
+  "general": {
+    "appName": "Mira",
+    "appNameFull": "Mira — Salon Management System",
+    "notImplemented": "This page will be implemented later",
+    "roles": {
+      "ADMIN": "Admin",
+      "RECEPTIONIST": "Receptionist",
+      "STYLIST": "Stylist"
+    }
+  },
+  "calendar": {
+    "today": "Today",
+    "week": "Week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "days": {
+      "0": "Sun",
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat"
+    }
+  }
+}

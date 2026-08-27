@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Builds
+client/dist/
+server/dist/
+
+# Env & secrets
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Logs
+*.log
+*-log.txt
+logs/
+
+# Backups & runtime data
+server/backups/
+*.dump
+*.sql.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Prisma generated (kept out; regenerated on install)
+server/node_modules/.prisma/
+
+# runtime logs
+log_silent.txt

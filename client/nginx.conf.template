@@ -1,0 +1,25 @@
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 10m;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # API proxy target is injected at container start via the
+    # API_PROXY_TARGET environment variable (e.g. the Railway
+    # private/public URL of the server service).
+    location /api/ {
+        proxy_pass ${API_PROXY_TARGET};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

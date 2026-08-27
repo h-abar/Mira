@@ -1,0 +1,504 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  RECEPTIONIST
+  STYLIST
+}
+
+enum EmployeeRole {
+  STYLIST
+  BEAUTICIAN
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  ARRIVED
+  DONE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  WALLET
+  ELECTRONIC
+}
+
+enum InvoiceStatus {
+  PAID
+  PENDING
+  CANCELLED
+}
+
+enum MovementType {
+  IN
+  SALE
+  USAGE
+  LOSS
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum LoyaltyType {
+  EARN
+  REDEEM
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum GiftCardStatus {
+  ACTIVE
+  REDEEMED
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Branch {
+  id            Int            @id @default(autoincrement())
+  nameAr        String
+  nameEn        String
+  address       String?
+  phone         String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  products      Product[]
+  invoices      Invoice[]
+  shiftSessions ShiftSession[]
+  users         User[]
+
+  @@map("branches")
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  username       String         @unique
+  passwordHash   String
+  role           UserRole       @default(ADMIN)
+  permissions    String[]       @default([])
+  employeeId     Int?
+  employee       Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  branchId       Int?
+  branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  expenses       Expense[]
+  shiftSessions  ShiftSession[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("users")
+}
+
+model Client {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  phone                String?
+  whatsapp             String?
+  email                String?
+  birthdate            DateTime?
+  notes                String?
+  totalSpent           Decimal               @default(0) @db.Decimal(10, 2)
+  loyaltyPoints        Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  appointments         Appointment[]
+  invoices             Invoice[]
+  loyaltyTransactions  LoyaltyTransaction[]
+  clientMemberships    ClientMembership[]
+  giftCards            GiftCard[]
+
+  @@map("clients")
+}
+
+model Service {
+  id              Int           @id @default(autoincrement())
+  nameAr          String
+  nameEn          String
+  category        String
+  price           Decimal       @db.Decimal(10, 2)
+  durationMinutes Int
+  cost            Decimal       @default(0) @db.Decimal(10, 2)
+  isActive        Boolean       @default(true)
+  appointments    Appointment[]
+  invoiceItems    InvoiceItem[]
+
+  @@map("services")
+}
+
+model Employee {
+  id             Int            @id @default(autoincrement())
+  nameAr         String
+  nameEn         String
+  phone          String?
+  role           EmployeeRole   @default(STYLIST)
+  commissionRate Decimal        @default(0) @db.Decimal(5, 2)
+  hireDate       DateTime
+  isActive       Boolean        @default(true)
+  shiftName      String?        @default("الوردية الاعتيادية")
+  shiftStart     String?        @default("09:00")
+  shiftEnd       String?        @default("17:00")
+  workDays       String?        @default("Sun,Mon,Tue,Wed,Thu")
+  morningStart   String?
+  morningEnd     String?
+  eveningStart   String?
+  eveningEnd     String?
+  users          User[]
+  appointments   Appointment[]
+  invoices       Invoice[]
+  invoiceItems   InvoiceItem[]
+  shiftSessions  ShiftSession[]
+  attendance     Attendance[]
+
+  @@map("employees")
+}
+
+model ShiftSession {
+  id             Int         @id @default(autoincrement())
+  employeeId     Int
+  employee       Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  openedByUserId Int
+  openedByUser   User        @relation(fields: [openedByUserId], references: [id], onDelete: Cascade)
+  branchId       Int?
+  branch         Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  startTime      DateTime    @default(now())
+  endTime        DateTime?
+  openingBalance Decimal     @default(0) @db.Decimal(10, 2)
+  expectedCash   Decimal     @default(0) @db.Decimal(10, 2)
+  actualCash     Decimal?    @db.Decimal(10, 2)
+  difference     Decimal?    @db.Decimal(10, 2)
+  totalSales     Decimal     @default(0) @db.Decimal(10, 2)
+  totalCashSales Decimal     @default(0) @db.Decimal(10, 2)
+  totalCardSales Decimal     @default(0) @db.Decimal(10, 2)
+  totalExpenses  Decimal     @default(0) @db.Decimal(10, 2)
+  status         ShiftStatus @default(OPEN)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  invoices       Invoice[]
+  expenses       Expense[]
+
+  @@map("shift_sessions")
+}
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  clientId        Int
+  client          Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  employeeId      Int
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  serviceId       Int
+  service         Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  date            DateTime
+  startTime       String
+  endTime         String
+  status          AppointmentStatus @default(BOOKED)
+  notes           String?
+  cancellationFee Decimal?          @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now())
+  payments        Payment[]
+
+  @@map("appointments")
+}
+
+model Invoice {
+  id             Int           @id @default(autoincrement())
+  invoiceNo      String        @unique
+  clientId       Int
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  employeeId     Int
+  employee       Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shiftSessionId Int?
+  shiftSession   ShiftSession? @relation(fields: [shiftSessionId], references: [id], onDelete: SetNull)
+  branchId       Int?
+  branch         Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  date           DateTime      @default(now())
+  subtotal       Decimal       @default(0) @db.Decimal(10, 2)
+  discount       Decimal       @default(0) @db.Decimal(10, 2)
+  tax            Decimal       @default(0) @db.Decimal(10, 2)
+  tip            Decimal       @default(0) @db.Decimal(10, 2)
+  giftCardId     Int?
+  giftCard       GiftCard?     @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
+  giftCardAmount Decimal       @default(0) @db.Decimal(10, 2)
+  total          Decimal       @default(0) @db.Decimal(10, 2)
+  offerCode      String?
+  pointsEarned   Int           @default(0)
+  pointsRedeemed Int           @default(0)
+  paymentMethod  PaymentMethod @default(CASH)
+  status         InvoiceStatus @default(PAID)
+  createdAt      DateTime      @default(now())
+  items          InvoiceItem[]
+  payments       Payment[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id            Int         @id @default(autoincrement())
+  invoiceId     Int?
+  invoice       Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  appointmentId Int?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  method        String
+  amount        Decimal     @db.Decimal(10, 2)
+  status        String      @default("PENDING")
+  transactionId String?
+  referenceNo   String?
+  createdAt     DateTime    @default(now())
+
+  @@map("payments")
+}
+
+model InvoiceItem {
+  id          Int       @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  serviceId   Int?
+  service     Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  productId   Int?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  employeeId  Int?
+  employee    Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  description String
+  quantity    Int       @default(1)
+  unitPrice   Decimal   @db.Decimal(10, 2)
+  lineTotal   Decimal   @db.Decimal(10, 2)
+
+  @@map("invoice_items")
+}
+
+model Expense {
+  id             Int           @id @default(autoincrement())
+  date           DateTime      @default(now())
+  category       String
+  amount         Decimal       @db.Decimal(10, 2)
+  description    String?
+  createdBy      Int
+  creator        User          @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  shiftSessionId Int?
+  shiftSession   ShiftSession? @relation(fields: [shiftSessionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+
+  @@map("expenses")
+}
+
+model Product {
+  id                 Int                  @id @default(autoincrement())
+  nameAr             String
+  nameEn             String
+  barcode            String?
+  category           String
+  quantity           Int                  @default(0)
+  unit               String               @default("pcs")
+  costPrice          Decimal              @default(0) @db.Decimal(10, 2)
+  salePrice          Decimal              @default(0) @db.Decimal(10, 2)
+  minStock           Int                  @default(0)
+  isActive           Boolean              @default(true)
+  supplier           String?
+  supplierId         Int?
+  supplierRel        Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  branchId           Int?
+  branch             Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  invoiceItems       InvoiceItem[]
+  movements          StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@map("products")
+}
+
+model StockMovement {
+  id          Int          @id @default(autoincrement())
+  productId   Int
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type        MovementType
+  quantity    Int
+  date        DateTime     @default(now())
+  referenceId String?
+
+  @@map("stock_movements")
+}
+
+model LoyaltyTransaction {
+  id           Int         @id @default(autoincrement())
+  clientId     Int
+  client       Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  points       Int
+  type         LoyaltyType
+  balanceAfter Int
+  referenceId  String?
+  note         String?
+  createdAt    DateTime    @default(now())
+
+  @@map("loyalty_transactions")
+}
+
+model Offer {
+  id           Int          @id @default(autoincrement())
+  code         String       @unique
+  nameAr       String
+  nameEn       String
+  discountType DiscountType
+  value        Decimal      @db.Decimal(10, 2)
+  validFrom    DateTime?
+  validTo      DateTime?
+  minTotal     Decimal      @default(0) @db.Decimal(10, 2)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  @@map("offers")
+}
+
+model Attendance {
+  id          Int       @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime  @default(now())
+  checkIn     DateTime?
+  checkOut    DateTime?
+  hoursWorked Decimal?  @db.Decimal(5, 2)
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([employeeId, date])
+  @@map("attendance")
+}
+
+model Supplier {
+  id             Int             @id @default(autoincrement())
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  notes          String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id            Int                 @id @default(autoincrement())
+  orderNo       String              @unique
+  supplierId    Int?
+  supplier      Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  date          DateTime            @default(now())
+  status        PurchaseStatus      @default(PENDING)
+  subtotal      Decimal             @default(0) @db.Decimal(10, 2)
+  discount      Decimal             @default(0) @db.Decimal(10, 2)
+  total         Decimal             @default(0) @db.Decimal(10, 2)
+  paymentMethod PaymentMethod       @default(CASH)
+  notes         String?
+  createdBy     Int
+  creator       User                @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  items         PurchaseOrderItem[]
+  createdAt     DateTime            @default(now())
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              Int            @id @default(autoincrement())
+  purchaseOrderId Int
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       Int?
+  product         Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName     String
+  quantity        Int
+  unitCost        Decimal        @db.Decimal(10, 2)
+  lineTotal       Decimal        @db.Decimal(10, 2)
+
+  @@map("purchase_order_items")
+}
+
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+model Notification {
+  id          Int                @id @default(autoincrement())
+  type        String
+  target      String
+  message     String
+  status      NotificationStatus @default(PENDING)
+  referenceId String?
+  createdAt   DateTime           @default(now())
+
+  @@map("notifications")
+}
+
+model MembershipPlan {
+  id           Int                 @id @default(autoincrement())
+  nameAr       String
+  nameEn       String
+  price        Decimal             @db.Decimal(10, 2)
+  durationDays Int                 @default(30)
+  serviceIds   Int[]               @default([])
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  memberships  ClientMembership[]
+
+  @@map("membership_plans")
+}
+
+model ClientMembership {
+  id        Int              @id @default(autoincrement())
+  clientId  Int
+  client    Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  planId    Int
+  plan      MembershipPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+
+  @@map("client_memberships")
+}
+
+model GiftCard {
+  id           Int            @id @default(autoincrement())
+  code         String         @unique
+  clientId     Int?
+  client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  balance      Decimal        @db.Decimal(10, 2)
+  initialValue Decimal        @db.Decimal(10, 2)
+  status       GiftCardStatus @default(ACTIVE)
+  expiresAt    DateTime?
+  createdAt    DateTime       @default(now())
+  invoices     Invoice[]
+
+  @@map("gift_cards")
+}

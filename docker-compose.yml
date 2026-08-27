@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: saloon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: saloon
+      POSTGRES_PASSWORD: saloon
+      POSTGRES_DB: saloon
+    ports:
+      - "5432:5432"
+    volumes:
+      - saloon_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saloon -d saloon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build: ./server
+    container_name: saloon-app
+    restart: unless-stopped
+    env_file: ./server/.env
+    environment:
+      DATABASE_URL: postgresql://saloon:saloon@postgres:5432/saloon
+      NODE_ENV: production
+      PORT: "4000"
+      CORS_ORIGIN: "http://localhost:8080"
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: saloon
+      PG_PASSWORD: saloon
+      PG_DATABASE: saloon
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backups:/app/backups
+
+  web:
+    build: ./client
+    container_name: saloon-web
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "8080:80"
+
+volumes:
+  saloon_pgdata:
