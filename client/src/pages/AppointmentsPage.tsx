@@ -302,7 +302,6 @@ function AppointmentDialog({
   pointValue,
   onClose,
   onSaved,
-  onItemSaved,
 }: AppointmentDialogProps) {
   const [form, setForm] = useState<FormState>({
     clientId: '',
@@ -314,8 +313,8 @@ function AppointmentDialog({
     notes: '',
   });
   const [items, setItems] = useState<
-    Array<{ serviceId: number | ''; employeeId: number | ''; startTime: string }>
-  >([{ serviceId: '', employeeId: '', startTime: '10:00' }]);
+    Array<{ serviceId: number | ''; employeeId: number | '' }>
+  >([{ serviceId: '', employeeId: '' }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -326,7 +325,7 @@ function AppointmentDialog({
     setError(null);
     if (mode === 'edit' && appointment) {
       setItems([
-        { serviceId: appointment.serviceId, employeeId: appointment.employeeId, startTime: appointment.startTime },
+        { serviceId: appointment.serviceId, employeeId: appointment.employeeId },
       ]);
       setForm({
         clientId: appointment.clientId,
@@ -338,7 +337,7 @@ function AppointmentDialog({
         notes: appointment.notes ?? '',
       });
     } else {
-      setItems([{ serviceId: '', employeeId: '', startTime: '10:00' }]);
+      setItems([{ serviceId: '', employeeId: '' }]);
       setForm({
         clientId: '',
         employeeId: '',
@@ -372,18 +371,17 @@ function AppointmentDialog({
     });
   };
 
-  // Auto-computed schedule for the multi-service booking: end time of every
-  // row is derived from its service duration. Same employee -> back-to-back
-  // starting at form.startTime; different employees run in parallel.
+  // Auto-computed schedule for multi-service booking:
+  // Same employee -> back-to-back starting at form.startTime; different employees run in parallel.
   const itemSchedule = useMemo(() => {
     const cursors = new Map<number, string>();
     return items.map((it) => {
       if (it.serviceId === '' || it.employeeId === '') return null;
       const service = services.find((s) => s.id === it.serviceId);
-      if (!service || !it.startTime) return null;
-      const start = cursors.get(it.employeeId) ?? it.startTime;
+      if (!service || !form.startTime) return null;
+      const start = cursors.get(Number(it.employeeId)) ?? form.startTime;
       const end = addMinutes(start, service.durationMinutes);
-      cursors.set(it.employeeId, end);
+      cursors.set(Number(it.employeeId), end);
       const employee = employees.find((e) => e.id === it.employeeId);
       return {
         key: `${it.serviceId}-${it.employeeId}`,
@@ -391,48 +389,28 @@ function AppointmentDialog({
         employeeName: employee ? nameOf(employee) : '',
         start,
         end,
+        price: Number(service.price ?? 0),
+        duration: service.durationMinutes,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, services, employees, lang]);
+  }, [items, services, employees, form.startTime, lang]);
 
-  // Save a single service immediately as its own appointment ("each service
-  // saves by itself"). The dialog stays open so more services can be added to
-  // the same booking (same client + date) one by one.
-  const saveItem = async (index: number) => {
-    const it = items[index];
-    if (!form.clientId) {
-      setError(L.fillRequired);
-      return;
-    }
-    if (it.serviceId === '' || it.employeeId === '' || !it.startTime) {
-      setError(L.fillAllItems);
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await createAppointment({
-        clientId: Number(form.clientId),
-        employeeId: Number(it.employeeId),
-        serviceId: Number(it.serviceId),
-        date: form.date.format('YYYY-MM-DD'),
-        startTime: it.startTime,
-        notes: form.notes.trim() || undefined,
-      });
-      if (onItemSaved) onItemSaved(L.created);
-      // Clear the saved row (keep its time) so the next service can be entered quickly.
-      setItems((prev) =>
-        prev.map((p, i) =>
-          i === index ? { serviceId: '', employeeId: '', startTime: it.startTime } : p,
-        ),
-      );
-    } catch (err) {
-      setError((err as ApiError).message || L.saveFailed);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const totalCalculatedPrice = useMemo(() => {
+    return items.reduce((sum, it) => {
+      if (it.serviceId === '') return sum;
+      const s = services.find((serv) => serv.id === it.serviceId);
+      return sum + (s ? Number(s.price ?? 0) : 0);
+    }, 0);
+  }, [items, services]);
+
+  const totalCalculatedMinutes = useMemo(() => {
+    return items.reduce((sum, it) => {
+      if (it.serviceId === '') return sum;
+      const s = services.find((serv) => serv.id === it.serviceId);
+      return sum + (s ? s.durationMinutes : 0);
+    }, 0);
+  }, [items, services]);
 
   const handleSubmit = async () => {
     if (!form.clientId || !form.startTime) {
@@ -449,16 +427,28 @@ function AppointmentDialog({
           setSubmitting(false);
           return;
         }
-        await createAppointmentGroup({
-          clientId: Number(form.clientId),
-          date: form.date.format('YYYY-MM-DD'),
-          startTime: form.startTime,
-          notes: form.notes.trim() || undefined,
-          items: filled.map((it) => ({
-            serviceId: Number(it.serviceId),
-            employeeId: Number(it.employeeId),
-          })),
-        });
+
+        if (filled.length === 1) {
+          await createAppointment({
+            clientId: Number(form.clientId),
+            employeeId: Number(filled[0].employeeId),
+            serviceId: Number(filled[0].serviceId),
+            date: form.date.format('YYYY-MM-DD'),
+            startTime: form.startTime,
+            notes: form.notes.trim() || undefined,
+          });
+        } else {
+          await createAppointmentGroup({
+            clientId: Number(form.clientId),
+            date: form.date.format('YYYY-MM-DD'),
+            startTime: form.startTime,
+            notes: form.notes.trim() || undefined,
+            items: filled.map((it) => ({
+              serviceId: Number(it.serviceId),
+              employeeId: Number(it.employeeId),
+            })),
+          });
+        }
         onSaved(L.created);
       } else if (appointment) {
         if (!form.employeeId || !form.serviceId) {
@@ -488,10 +478,14 @@ function AppointmentDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{mode === 'create' ? L.newAppointment : L.edit}</DialogTitle>
-      <DialogContent dividers sx={{ maxHeight: '58vh', overflowY: 'auto' }}>
-        <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        {mode === 'create' ? L.newAppointment : L.edit}
+      </DialogTitle>
+      <DialogContent dividers sx={{ maxHeight: '72vh', overflowY: 'auto' }}>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
+
+          {/* 1. Client selection */}
           <Autocomplete<Client>
             fullWidth
             size="small"
@@ -543,9 +537,10 @@ function AppointmentDialog({
               );
             }}
             renderInput={(params) => (
-              <TextField {...params} label={L.client} placeholder={L.searchClientHint} />
+              <TextField {...params} label={L.client} placeholder={L.searchClientHint} required />
             )}
           />
+
           {(() => {
             const selected = clients.find((c) => c.id === form.clientId);
             const pts = selected?.loyaltyPoints ?? 0;
@@ -556,7 +551,7 @@ function AppointmentDialog({
                   px: 1.5,
                   py: 1,
                   border: 1.5,
-                  borderColor: 'primary.main',
+                  borderColor: 'primary.light',
                   bgcolor: 'action.hover',
                   borderRadius: 2,
                   display: 'flex',
@@ -574,8 +569,56 @@ function AppointmentDialog({
               </Box>
             );
           })()}
+
+          {/* 2. Date & Time Selection */}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <DatePicker
+              label={L.date}
+              value={form.date}
+              onChange={(value: Dayjs | null) => {
+                if (value) {
+                  setForm((f) => ({ ...f, date: value }));
+                }
+              }}
+              slotProps={{ textField: { fullWidth: true, size: 'small', required: true } }}
+            />
+            <TextField
+              type="time"
+              label={L.startTime}
+              size="small"
+              value={form.startTime}
+              onChange={(e) =>
+                setForm((f) => {
+                  const next = { ...f, startTime: e.target.value };
+                  if (mode === 'edit' && typeof f.serviceId === 'number') {
+                    const service = services.find((s) => s.id === f.serviceId);
+                    if (service && next.startTime) {
+                      next.endTime = addMinutes(next.startTime, service.durationMinutes);
+                    }
+                  }
+                  return next;
+                })
+              }
+              fullWidth
+              required
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            {mode === 'edit' && (
+              <TextField
+                type="time"
+                label={L.endTime}
+                size="small"
+                value={form.endTime}
+                onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                fullWidth
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            )}
+          </Stack>
+
+          {/* 3. Services Selection */}
           {mode === 'edit' ? (
-            <>
+            <Stack spacing={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="dialog-employee-label">{L.employee}</InputLabel>
                 <Select<number | ''>
@@ -611,187 +654,146 @@ function AppointmentDialog({
                   </MenuItem>
                   {services.map((s) => (
                     <MenuItem key={s.id} value={s.id}>
-                      {nameOf(s)} — {Number(s.price).toFixed(2)}
+                      {nameOf(s)} — {Number(s.price).toFixed(2)} ({s.durationMinutes} {lang === 'ar' ? 'دقيقة' : 'min'})
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-            </>
+            </Stack>
           ) : (
-            <>
-              <Typography variant="subtitle2" color="text.secondary">
-                {L.bookingItems}
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                {L.bookingItems} ({items.length})
               </Typography>
+
               {items.map((item, index) => (
-                <Stack key={index} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel id={`item-service-${index}`}>{L.service}</InputLabel>
-                    <Select<number | ''>
-                      labelId={`item-service-${index}`}
-                      label={L.service}
-                      value={item.serviceId}
-                      onChange={(e: SelectChangeEvent<number | ''>) =>
-                        setItems((prev) =>
-                          prev.map((it, i) =>
-                            i === index ? { ...it, serviceId: e.target.value as number | '' } : it,
-                          ),
-                        )
-                      }
-                    >
-                      <MenuItem value="" disabled>
-                        {L.selectService}
-                      </MenuItem>
-                      {services.map((s) => (
-                        <MenuItem key={s.id} value={s.id}>
-                          {nameOf(s)} — {Number(s.price).toFixed(2)} ({s.durationMinutes} {lang === 'ar' ? 'د' : 'min'})
+                <Box
+                  key={index}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    border: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+                    <FormControl fullWidth size="small">
+                      <InputLabel id={`item-service-${index}`}>{L.service}</InputLabel>
+                      <Select<number | ''>
+                        labelId={`item-service-${index}`}
+                        label={L.service}
+                        value={item.serviceId}
+                        onChange={(e: SelectChangeEvent<number | ''>) =>
+                          setItems((prev) =>
+                            prev.map((it, i) =>
+                              i === index ? { ...it, serviceId: e.target.value as number | '' } : it,
+                            ),
+                          )
+                        }
+                      >
+                        <MenuItem value="" disabled>
+                          {L.selectService}
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <FormControl fullWidth size="small">
-                    <InputLabel id={`item-employee-${index}`}>{L.employee}</InputLabel>
-                    <Select<number | ''>
-                      labelId={`item-employee-${index}`}
-                      label={L.employee}
-                      value={item.employeeId}
-                      onChange={(e: SelectChangeEvent<number | ''>) =>
-                        setItems((prev) =>
-                          prev.map((it, i) =>
-                            i === index ? { ...it, employeeId: e.target.value as number | '' } : it,
-                          ),
-                        )
-                      }
-                    >
-                      <MenuItem value="" disabled>
-                        {L.selectEmployee}
-                      </MenuItem>
-                      {employees.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id}>
-                          {nameOf(emp)}
+                        {services.map((s) => (
+                          <MenuItem key={s.id} value={s.id}>
+                            {nameOf(s)} — {Number(s.price).toFixed(2)} ({s.durationMinutes} {lang === 'ar' ? 'د' : 'min'})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <FormControl fullWidth size="small">
+                      <InputLabel id={`item-employee-${index}`}>{L.employee}</InputLabel>
+                      <Select<number | ''>
+                        labelId={`item-employee-${index}`}
+                        label={L.employee}
+                        value={item.employeeId}
+                        onChange={(e: SelectChangeEvent<number | ''>) =>
+                          setItems((prev) =>
+                            prev.map((it, i) =>
+                              i === index ? { ...it, employeeId: e.target.value as number | '' } : it,
+                            ),
+                          )
+                        }
+                      >
+                        <MenuItem value="" disabled>
+                          {L.selectEmployee}
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    type="time"
-                    label={L.startTime}
-                    size="small"
-                    value={item.startTime}
-                    onChange={(e) =>
-                      setItems((prev) =>
-                        prev.map((it, i) =>
-                          i === index ? { ...it, startTime: e.target.value } : it,
-                        ),
-                      )
-                    }
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                  <IconButton
-                    color="primary"
-                    onClick={() => void saveItem(index)}
-                    disabled={
-                      submitting ||
-                      !form.clientId ||
-                      item.serviceId === '' ||
-                      item.employeeId === '' ||
-                      !item.startTime
-                    }
-                    title={lang === 'ar' ? 'حفظ هذه الخدمة' : 'Save this service'}
-                  >
-                    <SaveIcon />
-                  </IconButton>
-                  <IconButton
-                    color="error"
-                    onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
-                    disabled={items.length === 1}
-                    title={L.removeItemRow}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
+                        {employees.map((emp) => (
+                          <MenuItem key={emp.id} value={emp.id}>
+                            {nameOf(emp)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {items.length > 1 && (
+                      <Tooltip title={L.removeItemRow}>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                </Box>
               ))}
+
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() =>
+                    setItems((prev) => [...prev, { serviceId: '', employeeId: '' }])
+                  }
+                >
+                  {L.addItemRow}
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  {L.itemsHint}
+                </Typography>
+              </Stack>
+
               {itemSchedule.some(Boolean) && (
                 <Box
                   sx={{
-                    px: 1.5,
-                    py: 1,
-                    border: 1.5,
-                    borderColor: 'divider',
+                    px: 2,
+                    py: 1.5,
+                    border: 1,
+                    borderColor: 'primary.light',
                     bgcolor: 'action.hover',
                     borderRadius: 2,
                   }}
                 >
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" gutterBottom={false}>
-                    {lang === 'ar' ? 'الجدول المحسوب تلقائيًا' : 'Auto-computed schedule'}
-                  </Typography>
-                  {itemSchedule.map((slot, i) =>
-                    slot ? (
-                      <Typography key={i} variant="caption" display="block">
-                        🕒 {slot.start} – {slot.end} — {slot.serviceName}
-                        {slot.employeeName ? ` (${slot.employeeName})` : ''}
-                      </Typography>
-                    ) : null,
-                  )}
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography variant="caption" fontWeight={800} color="primary.main">
+                      {lang === 'ar' ? 'الجدول الزمني المحسوب للحجز' : 'Calculated Booking Schedule'}
+                    </Typography>
+                    <Typography variant="caption" fontWeight={700} color="text.primary">
+                      {lang === 'ar' ? 'المجموع:' : 'Total:'} {totalCalculatedPrice.toFixed(2)} ({totalCalculatedMinutes} {lang === 'ar' ? 'دقيقة' : 'min'})
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    {itemSchedule.map((slot, i) =>
+                      slot ? (
+                        <Typography key={i} variant="caption" display="block" color="text.secondary">
+                          🕒 <strong>{slot.start} – {slot.end}</strong> : {slot.serviceName} ({slot.employeeName})
+                        </Typography>
+                      ) : null,
+                    )}
+                  </Stack>
                 </Box>
               )}
-              <Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={() => setItems((prev) => [...prev, { serviceId: '', employeeId: '', startTime: form.startTime || '10:00' }])}
-                >
-                  {L.addItemRow}
-                </Button>
-                <Typography variant="caption" display="block" sx={{ mt: 0.5 }} color="text.secondary">
-                  {L.itemsHint}
-                </Typography>
-              </Box>
-            </>
+            </Stack>
           )}
-          <DatePicker
-            label={L.date}
-            value={form.date}
-            onChange={(value: Dayjs | null) => {
-              if (value) {
-                setForm((f) => ({ ...f, date: value }));
-              }
-            }}
-            slotProps={{ textField: { fullWidth: true, size: 'small' } }}
-          />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              type="time"
-              label={L.startTime}
-              size="small"
-              value={form.startTime}
-              onChange={(e) =>
-                setForm((f) => {
-                  const next = { ...f, startTime: e.target.value };
-                  // End time always follows the service duration.
-                  const service =
-                    typeof f.serviceId === 'number'
-                      ? services.find((s) => s.id === f.serviceId)
-                      : undefined;
-                  if (service && next.startTime) {
-                    next.endTime = addMinutes(next.startTime, service.durationMinutes);
-                  }
-                  return next;
-                })
-              }
-              fullWidth
-              required
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            <TextField
-              type="time"
-              label={L.endTime}
-              size="small"
-              value={form.endTime}
-              onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
-              fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          </Stack>
+
+          {/* 4. Notes */}
           <TextField
             label={L.notes}
             size="small"
@@ -803,10 +805,17 @@ function AppointmentDialog({
           />
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>{L.cancel}</Button>
-        <Button variant="contained" onClick={() => void handleSubmit()} disabled={submitting}>
-          {submitting ? <CircularProgress size={18} color="inherit" /> : L.save}
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} color="inherit">{L.cancel}</Button>
+        <Button
+          variant="contained"
+          size="large"
+          startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+          onClick={() => void handleSubmit()}
+          disabled={submitting}
+          sx={{ px: 3 }}
+        >
+          {submitting ? (lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : L.save}
         </Button>
       </DialogActions>
     </Dialog>

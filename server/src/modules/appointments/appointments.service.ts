@@ -140,12 +140,23 @@ async function assertWithinWorkingHours(
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
 
+  const DAY_NAME_AR: Record<string, string> = {
+    Sun: 'الأحد',
+    Mon: 'الاثنين',
+    Tue: 'الثلاثاء',
+    Wed: 'الأربعاء',
+    Thu: 'الخميس',
+    Fri: 'الجمعة',
+    Sat: 'السبت',
+  };
+
   const closedDays = (map.get('CLOSED_DAYS') ?? '')
     .split(',')
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean);
   if (closedDays.includes(DAY_SHORT_BY_GETDAY[idx].toLowerCase())) {
-    throw new ApiError(400, `The salon is closed on ${DAY_SHORT_BY_GETDAY[idx]}.`);
+    const dayNameAr = DAY_NAME_AR[DAY_SHORT_BY_GETDAY[idx]] || DAY_SHORT_BY_GETDAY[idx];
+    throw new ApiError(400, `الصالون مغلق في يوم (${dayNameAr}) — يرجى اختيار يوم آخر أو تفعيل اليوم في الإعدادات.`);
   }
 
   // Time-of-day enforcement is opt-in: it only blocks bookings that fall

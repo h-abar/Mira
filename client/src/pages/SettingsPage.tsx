@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -93,7 +93,7 @@ interface DayHoursRow {
   day: string;
   opening: string;
   closing: string;
-  closed: boolean;
+  isOpen: boolean;
 }
 
 const L = {
@@ -103,9 +103,12 @@ const L = {
     save: 'حفظ', saving: 'جارٍ الحفظ...', saved: 'تم حفظ الإعدادات بنجاح',
     saveFailed: 'فشل حفظ الإعدادات', loadFailed: 'تعذر تحميل الإعدادات',
     settingsNote: 'تُستخدم هذه الإعدادات في الفوترة ونقاط الولاء وعرض اسم الصالون.',
-    hoursNote: 'حدد ساعات العمل لكل يوم أو انسخ ساعات يوم لجميع الأيام. تُستخدم في الحجز عبر الإنترنت والموقع.',
-    hoursOpen: 'البداية', hoursClose: 'النهاية', hoursClosed: 'مغلق',
-    hoursCopy: 'نسخ ساعات هذا اليوم لجميع الأيام',
+    hoursNote: 'حدد أيام وساعات العمل للصالون. الأيام المفعلة كـ (يوم عمل) تتاح لحجز المواعيد، والأيام غير المفعلة تعتبر إجازة أسبوعية مغلقة.',
+    hoursOpen: 'وقت الفتح', hoursClose: 'وقت الإغلاق', hoursWorkDay: 'يوم عمل مفعّل', hoursDayOff: 'إجازة أسبوعية',
+    hoursCopy: 'نسخ ساعات هذا اليوم لجميع الأيام المفتوحة',
+    saveHoursBtn: 'حفظ ساعات وأيام العمل',
+    saveIdentityBtn: 'حفظ هوية الصالون',
+    saveInvoicingBtn: 'حفظ إعدادات الفوترة',
     backupNote: 'نزّل نسخة احتياطية من جميع البيانات. يوصى بالتنزيل بشكل دوري للحفاظ على بياناتك آمنة.',
     lastExport: 'آخر تصدير:', neverExported: 'لم يتم التصدير بعد',
     exported: 'تم تنزيل النسخة الاحتياطية بنجاح', exportFailed: 'فشل تنزيل النسخة الاحتياطية',
@@ -153,9 +156,12 @@ const L = {
     save: 'Save', saving: 'Saving...', saved: 'Settings saved successfully',
     saveFailed: 'Failed to save settings', loadFailed: 'Failed to load settings',
     settingsNote: 'These settings are used for invoicing, loyalty points and the salon name.',
-    hoursNote: 'Set working hours per day, or copy one day to all days. Used by online booking and the website.',
-    hoursOpen: 'Opening', hoursClose: 'Closing', hoursClosed: 'Closed',
-    hoursCopy: 'Copy this day to all days',
+    hoursNote: 'Set salon working hours and active workdays. Active days allow bookings; inactive days are marked as weekly days off.',
+    hoursOpen: 'Opening', hoursClose: 'Closing', hoursWorkDay: 'Work Day (Active)', hoursDayOff: 'Day Off',
+    hoursCopy: 'Copy hours to all open days',
+    saveHoursBtn: 'Save Working Hours',
+    saveIdentityBtn: 'Save Salon Identity',
+    saveInvoicingBtn: 'Save Invoicing Settings',
     backupNote: 'Download a backup of all data. We recommend downloading regularly to keep your data safe.',
     lastExport: 'Last export:', neverExported: 'No export yet',
     exported: 'Backup downloaded successfully', exportFailed: 'Failed to download backup',
@@ -211,7 +217,6 @@ export default function SettingsPage() {
 
   const [tab, setTab] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [seeded, setSeeded] = useState(false);
   const [savingSection, setSavingSection] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -251,29 +256,31 @@ export default function SettingsPage() {
       .catch(() => undefined);
   }, []);
 
-  // Seed local values once settings load.
+  // ---- Working hours state ----
+  const [weekly, setWeekly] = useState<DayHoursRow[]>(
+    DAY_ORDER.map((day) => ({ day, opening: '10:00', closing: '21:00', isOpen: true })),
+  );
+
+  // Sync values and working hours from settings whenever loaded or updated.
   useEffect(() => {
-    if (settingsQuery.data && !seeded) {
+    if (settingsQuery.data) {
       const byKey = settingsQuery.data.byKey;
       setValues({ ...byKey });
-      // Seed working hours from the stored settings so the saved times are
-      // shown (not the hard-coded defaults). Previously the weekly grid only
-      // re-seeded after a save, so on first open it always displayed the
-      // default 10:00/21:00 and any saved times appeared to "revert".
+      const closedDays = (byKey.CLOSED_DAYS ?? '')
+        .split(',')
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean);
+
       setWeekly(
         DAY_ORDER.map((day) => ({
           day,
           opening: byKey[`${day.toUpperCase()}_OPENING`] ?? '10:00',
           closing: byKey[`${day.toUpperCase()}_CLOSING`] ?? '21:00',
-          closed: (byKey.CLOSED_DAYS ?? '')
-            .split(',')
-            .map((d) => d.trim().toLowerCase())
-            .includes(day.toLowerCase()),
+          isOpen: !closedDays.includes(day.toLowerCase()),
         })),
       );
-      setSeeded(true);
     }
-  }, [settingsQuery.data, seeded]);
+  }, [settingsQuery.data]);
 
   useEffect(() => {
     getBackupSchedule()
@@ -364,10 +371,6 @@ export default function SettingsPage() {
     }
   };
 
-  // ---- Working hours ----
-  const [weekly, setWeekly] = useState<DayHoursRow[]>(
-    DAY_ORDER.map((day) => ({ day, opening: '10:00', closing: '21:00', closed: false })),
-  );
   const updateDay = (day: string, patch: Partial<DayHoursRow>) =>
     setWeekly((prev) => prev.map((r) => (r.day === day ? { ...r, ...patch } : r)));
 
@@ -376,13 +379,14 @@ export default function SettingsPage() {
       prev.map((r) =>
         r.day === source.day
           ? r
-          : { ...r, opening: source.opening, closing: source.closing, closed: source.closed },
+          : { ...r, opening: source.opening, closing: source.closing },
       ),
     );
 
   const saveHours = async () => {
+    const closedList = weekly.filter((r) => !r.isOpen).map((r) => r.day);
     const payload: Record<string, string> = {
-      CLOSED_DAYS: weekly.filter((r) => r.closed).map((r) => r.day).join(','),
+      CLOSED_DAYS: closedList.join(','),
     };
     for (const r of weekly) {
       payload[`${r.day.toUpperCase()}_OPENING`] = r.opening;
@@ -808,23 +812,35 @@ export default function SettingsPage() {
                 )}
               </Box>
 
-              {/* Invoicing & messages */}
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                {lang === 'ar' ? 'الفوترة والرسائل' : 'Invoicing & Messages'}
-              </Typography>
-              {renderSettingFields(['VAT_RATE', 'WELCOME_MESSAGE', 'SALON_POLICY'])}
-              {isAdmin && (
-                <Button
-                  size="small"
-                  variant="contained"
-                  startIcon={savingSection === 'invoicing' ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                  onClick={() => void saveKeys(['VAT_RATE', 'WELCOME_MESSAGE', 'SALON_POLICY'], 'invoicing')}
-                  disabled={savingSection !== null}
-                  sx={{ mt: 2, mb: 1, alignSelf: 'flex-start' }}
-                >
-                  {savingSection === 'invoicing' ? l.saving : l.save}
-                </Button>
-              )}
+              {/* Invoicing & messages — dedicated save */}
+              <Box
+                sx={{
+                  border: 1.5,
+                  borderColor: 'secondary.main',
+                  borderRadius: 2,
+                  p: 2,
+                  maxWidth: 620,
+                  mb: 3,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={800} color="secondary.main" sx={{ mb: 1.5 }}>
+                  {lang === 'ar' ? 'الفوترة والرسائل' : 'Invoicing & Messages'}
+                </Typography>
+                {renderSettingFields(['VAT_RATE', 'WELCOME_MESSAGE', 'SALON_POLICY'])}
+                {isAdmin && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="secondary"
+                    startIcon={savingSection === 'invoicing' ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                    onClick={() => void saveKeys(['VAT_RATE', 'WELCOME_MESSAGE', 'SALON_POLICY'], 'invoicing')}
+                    disabled={savingSection !== null}
+                    sx={{ mt: 2, alignSelf: 'flex-start' }}
+                  >
+                    {savingSection === 'invoicing' ? l.saving : l.saveInvoicingBtn}
+                  </Button>
+                )}
+              </Box>
 
               <Grid container spacing={3} sx={{ mt: 1, maxWidth: 920 }} alignItems="stretch">
                 <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
@@ -838,64 +854,105 @@ export default function SettingsPage() {
           )}
 
           {tab === 1 && (
-            <Box sx={{ maxWidth: 720 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Box sx={{ maxWidth: 840 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
                 {l.hoursNote}
               </Typography>
-              <Stack spacing={1}>
+              <Stack spacing={1.5}>
                 {weekly.map((row) => (
-                  <Stack key={row.day} direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <Typography sx={{ minWidth: 95, fontWeight: 600 }} variant="body2">
-                      {lang === 'ar' ? DAY_AR[row.day] : DAY_EN[row.day]}
-                    </Typography>
-                    <TextField
-                      label={l.hoursOpen}
-                      value={row.opening}
-                      onChange={(e) => updateDay(row.day, { opening: e.target.value })}
-                      size="small"
-                      type="time"
-                      slotProps={{ inputLabel: { shrink: true } }}
-                      disabled={!isAdmin}
-                    />
-                    <TextField
-                      label={l.hoursClose}
-                      value={row.closing}
-                      onChange={(e) => updateDay(row.day, { closing: e.target.value })}
-                      size="small"
-                      type="time"
-                      slotProps={{ inputLabel: { shrink: true } }}
-                      disabled={!isAdmin}
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={row.closed}
-                          onChange={(e) => updateDay(row.day, { closed: e.target.checked })}
-                          disabled={!isAdmin}
-                        />
-                      }
-                      label={<Typography variant="body2">{l.hoursClosed}</Typography>}
-                    />
-                    <IconButton
-                      size="small"
-                      title={l.hoursCopy}
-                      onClick={() => copyHoursToAll(row)}
-                      disabled={!isAdmin}
-                    >
-                      <ScheduleIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
+                  <Box
+                    key={row.day}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: 1.5,
+                      borderColor: row.isOpen ? 'primary.light' : 'divider',
+                      bgcolor: row.isOpen ? 'background.paper' : 'action.hover',
+                      boxShadow: row.isOpen ? 1 : 0,
+                      display: 'flex',
+                      flexDirection: { xs: 'column', md: 'row' },
+                      alignItems: { xs: 'flex-start', md: 'center' },
+                      justifyContent: 'space-between',
+                      gap: 1.5,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Box sx={{ minWidth: 140, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography sx={{ fontWeight: 700, minWidth: 70 }} variant="subtitle1">
+                        {lang === 'ar' ? DAY_AR[row.day] : DAY_EN[row.day]}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        color={row.isOpen ? 'success' : 'default'}
+                        label={row.isOpen ? (lang === 'ar' ? 'مفتوح' : 'Open') : (lang === 'ar' ? 'إجازة' : 'Off')}
+                        variant={row.isOpen ? 'filled' : 'outlined'}
+                      />
+                    </Box>
+
+                    <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' } }}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            color="success"
+                            checked={row.isOpen}
+                            onChange={(e) => updateDay(row.day, { isOpen: e.target.checked })}
+                            disabled={!isAdmin}
+                          />
+                        }
+                        label={
+                          <Typography variant="body2" fontWeight={600} color={row.isOpen ? 'success.main' : 'text.secondary'}>
+                            {row.isOpen ? l.hoursWorkDay : l.hoursDayOff}
+                          </Typography>
+                        }
+                      />
+
+                      <TextField
+                        label={l.hoursOpen}
+                        value={row.opening}
+                        onChange={(e) => updateDay(row.day, { opening: e.target.value })}
+                        size="small"
+                        type="time"
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        disabled={!isAdmin || !row.isOpen}
+                        sx={{ width: 130 }}
+                      />
+                      <TextField
+                        label={l.hoursClose}
+                        value={row.closing}
+                        onChange={(e) => updateDay(row.day, { closing: e.target.value })}
+                        size="small"
+                        type="time"
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        disabled={!isAdmin || !row.isOpen}
+                        sx={{ width: 130 }}
+                      />
+
+                      <Tooltip title={l.hoursCopy}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => copyHoursToAll(row)}
+                            disabled={!isAdmin || !row.isOpen}
+                          >
+                            <ScheduleIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Stack>
+                  </Box>
                 ))}
               </Stack>
               {isAdmin && (
                 <Button
                   variant="contained"
+                  size="large"
                   startIcon={savingSection === 'hours' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void saveHours()}
                   disabled={savingSection !== null}
-                  sx={{ mt: 2 }}
+                  sx={{ mt: 3, px: 3 }}
                 >
-                  {savingSection === 'hours' ? l.saving : l.save}
+                  {savingSection === 'hours' ? l.saving : l.saveHoursBtn}
                 </Button>
               )}
             </Box>
