@@ -18,6 +18,7 @@ export function useSettings() {
       return { items: res.items, byKey };
     },
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
