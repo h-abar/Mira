@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -261,9 +261,12 @@ export default function SettingsPage() {
     DAY_ORDER.map((day) => ({ day, opening: '10:00', closing: '21:00', isOpen: true })),
   );
 
-  // Sync values and working hours from settings whenever loaded or updated.
+  // Sync values and working hours from settings ONCE when first loaded.
+  // Seeding on every refetch would discard unsaved edits in other sections
+  // (e.g. saving one tab would revert working-hours toggles back to the stored state).
+  const settingsSyncedRef = useRef(false);
   useEffect(() => {
-    if (settingsQuery.data) {
+    if (settingsQuery.data && !settingsSyncedRef.current) {
       const byKey = settingsQuery.data.byKey;
       setValues({ ...byKey });
       const closedDays = (byKey.CLOSED_DAYS ?? '')
@@ -279,6 +282,7 @@ export default function SettingsPage() {
           isOpen: !closedDays.includes(day.toLowerCase()),
         })),
       );
+      settingsSyncedRef.current = true;
     }
   }, [settingsQuery.data]);
 
