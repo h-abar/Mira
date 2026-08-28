@@ -26,6 +26,9 @@ RUN npm run build && rm -rf src && npm prune --omit=dev
 # Built SPA is copied into the image and served statically by Express.
 COPY --from=client-build /client/dist /client/dist
 
+# Arabic (Tajawal) fonts required by the PDF report exporter.
+COPY server/assets ./assets
+
 RUN apk add --no-cache openssl postgresql-client
 
 ENV NODE_ENV=production

@@ -429,7 +429,7 @@ export default function POSPage() {
   const total = Math.max(subtotal - discountNum + taxNum + tipNum, 0);
 
   const allItemsHaveEmployee = cart.every((c) => c.employeeId !== '');
-  const canComplete = Boolean(selectedClient && employeeId !== '' && cart.length > 0 && allItemsHaveEmployee);
+  const canComplete = Boolean(selectedClient && cart.length > 0 && allItemsHaveEmployee);
 
   // ---- Loyalty ----
   const clientPoints = selectedClient?.loyaltyPoints ?? 0;
@@ -501,15 +501,15 @@ export default function POSPage() {
     setCart((prev) => prev.filter((c) => c.key !== key));
 
   const handleComplete = async () => {
-    if (!selectedClient || employeeId === '' || cart.length === 0 || !allItemsHaveEmployee) {
+    const effectiveEmployeeId =
+      employeeId !== '' ? employeeId : (cart.find((c) => c.employeeId !== '')?.employeeId ?? '');
+    if (!selectedClient || effectiveEmployeeId === '' || cart.length === 0) {
       setSnack({
         message: !selectedClient
           ? l.requiredClient
-          : employeeId === ''
+          : effectiveEmployeeId === ''
             ? l.requiredEmployee
-            : !allItemsHaveEmployee
-              ? l.selectEmployee
-              : l.requiredItems,
+            : l.requiredItems,
         severity: 'error',
       });
       return;
@@ -518,7 +518,7 @@ export default function POSPage() {
     try {
       const invoice = await createInvoiceManual({
         clientId: selectedClient.id,
-        employeeId,
+        employeeId: effectiveEmployeeId,
         discount: discountNum,
         tax: taxNum,
         tip: tipNum > 0 ? tipNum : undefined,

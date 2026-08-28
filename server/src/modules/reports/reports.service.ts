@@ -769,12 +769,16 @@ function buildPdf(dataset: ExportDataset): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    let useArabicFont = true;
-    try {
-      doc.registerFont('ar', path.join(FONT_DIR, 'Tajawal-Regular.ttf'));
-      doc.registerFont('ar-bold', path.join(FONT_DIR, 'Tajawal-Bold.ttf'));
-    } catch {
-      useArabicFont = false;
+    const arRegular = path.join(FONT_DIR, 'Tajawal-Regular.ttf');
+    const arBold = path.join(FONT_DIR, 'Tajawal-Bold.ttf');
+    let useArabicFont = fs.existsSync(arRegular) && fs.existsSync(arBold);
+    if (useArabicFont) {
+      try {
+        doc.registerFont('ar', arRegular);
+        doc.registerFont('ar-bold', arBold);
+      } catch {
+        useArabicFont = false;
+      }
     }
 
     const isAr = dataset.lang === 'ar';
