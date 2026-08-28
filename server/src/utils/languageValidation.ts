@@ -11,10 +11,10 @@ export function containsLatin(value: string): boolean {
 
 export function isArabicText(value: string): boolean {
   const v = value.trim();
-  return v.length > 0 && containsArabic(v) && !containsLatin(v);
+  return v.length > 0 && containsArabic(v);
 }
 
 export function isLatinText(value: string): boolean {
   const v = value.trim();
-  return v.length > 0 && containsLatin(v) && !containsArabic(v);
+  return v.length > 0 && containsLatin(v);
 }

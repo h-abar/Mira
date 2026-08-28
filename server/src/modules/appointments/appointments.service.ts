@@ -23,8 +23,8 @@ export interface AppointmentCreateData {
   serviceId: number;
   date: Date;
   startTime: string;
-  endTime?: string;
-  notes?: string;
+  endTime?: string | null;
+  notes?: string | null;
 }
 
 export interface AppointmentUpdateData {
@@ -33,8 +33,8 @@ export interface AppointmentUpdateData {
   serviceId?: number;
   date?: Date;
   startTime?: string;
-  endTime?: string;
-  notes?: string;
+  endTime?: string | null;
+  notes?: string | null;
 }
 
 const appointmentInclude = {
@@ -268,7 +268,7 @@ export const appointmentsService = {
     clientId: number;
     date: Date;
     startTime: string;
-    notes?: string;
+    notes?: string | null;
     items: Array<{ serviceId: number; employeeId: number }>;
   }) {
     const serviceIds = [...new Set(data.items.map((it) => it.serviceId))];

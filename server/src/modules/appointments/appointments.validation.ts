@@ -6,25 +6,25 @@ const timeString = (label = 'time') =>
   z.string().regex(timeRegex, `Invalid ${label} format, expected HH:mm`);
 
 export const appointmentCreateSchema = z.object({
-  clientId: z.number().int().positive(),
-  employeeId: z.number().int().positive(),
-  serviceId: z.number().int().positive(),
+  clientId: z.coerce.number().int().positive(),
+  employeeId: z.coerce.number().int().positive(),
+  serviceId: z.coerce.number().int().positive(),
   date: z.coerce.date(),
   startTime: timeString('startTime'),
-  endTime: timeString('endTime').optional(),
-  notes: z.string().optional(),
+  endTime: timeString('endTime').nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 export const appointmentGroupCreateSchema = z.object({
-  clientId: z.number().int().positive(),
+  clientId: z.coerce.number().int().positive(),
   date: z.coerce.date(),
   startTime: timeString('startTime'),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
   items: z
     .array(
       z.object({
-        serviceId: z.number().int().positive(),
-        employeeId: z.number().int().positive(),
+        serviceId: z.coerce.number().int().positive(),
+        employeeId: z.coerce.number().int().positive(),
       }),
     )
     .min(1)
@@ -32,13 +32,13 @@ export const appointmentGroupCreateSchema = z.object({
 });
 
 export const appointmentUpdateSchema = z.object({
-  clientId: z.number().int().positive().optional(),
-  employeeId: z.number().int().positive().optional(),
-  serviceId: z.number().int().positive().optional(),
+  clientId: z.coerce.number().int().positive().optional(),
+  employeeId: z.coerce.number().int().positive().optional(),
+  serviceId: z.coerce.number().int().positive().optional(),
   date: z.coerce.date().optional(),
   startTime: timeString('startTime').optional(),
-  endTime: timeString('endTime').optional(),
-  notes: z.string().optional(),
+  endTime: timeString('endTime').nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 export const statusSchema = z.object({

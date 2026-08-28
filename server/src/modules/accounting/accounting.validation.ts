@@ -1,26 +1,26 @@
 import { z } from 'zod';
 
 export const invoiceItemSchema = z.object({
-  serviceId: z.number().int().positive().optional(),
-  productId: z.number().int().positive().optional(),
-  employeeId: z.number().int().positive().optional(),
-  description: z.string().optional(),
-  quantity: z.number().int().positive().default(1),
-  unitPrice: z.number().nonnegative().optional(),
+  serviceId: z.coerce.number().int().positive().nullable().optional(),
+  productId: z.coerce.number().int().positive().nullable().optional(),
+  employeeId: z.coerce.number().int().positive().nullable().optional(),
+  description: z.string().nullable().optional(),
+  quantity: z.coerce.number().int().positive().default(1),
+  unitPrice: z.coerce.number().nonnegative().optional(),
 });
 
 export const invoiceCreateSchema = z
   .object({
-    appointmentId: z.number().int().positive().optional(),
-    clientId: z.number().int().positive().optional(),
-    employeeId: z.number().int().positive().optional(),
-    discount: z.number().nonnegative().default(0),
-    tax: z.number().nonnegative().default(0),
-    tip: z.number().nonnegative().optional(),
+    appointmentId: z.coerce.number().int().positive().optional(),
+    clientId: z.coerce.number().int().positive().optional(),
+    employeeId: z.coerce.number().int().positive().optional(),
+    discount: z.coerce.number().nonnegative().default(0),
+    tax: z.coerce.number().nonnegative().default(0),
+    tip: z.coerce.number().nonnegative().optional(),
     paymentMethod: z.enum(['CASH', 'CARD', 'WALLET', 'ELECTRONIC']).default('CASH'),
-    branchId: z.number().int().positive().optional(),
+    branchId: z.coerce.number().int().positive().optional(),
     offerCode: z.string().trim().optional(),
-    redeemPoints: z.number().int().nonnegative().optional(),
+    redeemPoints: z.coerce.number().int().nonnegative().optional(),
     giftCardCode: z.string().trim().optional(),
     items: z.array(invoiceItemSchema).optional(),
   })
@@ -48,10 +48,10 @@ export const invoiceListQuerySchema = z.object({
 });
 
 export const expenseCreateSchema = z.object({
-  date: z.coerce.date().optional(),
-  category: z.string().min(1, 'Category is required'),
-  amount: z.number().positive(),
-  description: z.string().optional(),
+  date: z.coerce.date().nullable().optional(),
+  category: z.string().trim().min(1, 'Category is required'),
+  amount: z.coerce.number().positive(),
+  description: z.string().nullable().optional(),
 });
 
 export const expenseUpdateSchema = expenseCreateSchema.partial();

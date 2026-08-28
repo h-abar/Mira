@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 export const clientCreateSchema = z.object({
-  name: z.string().min(1, 'Client name is required'),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  birthdate: z.coerce.date().optional(),
-  notes: z.string().optional(),
+  name: z.string().trim().min(1, 'Client name is required'),
+  phone: z.string().nullable().optional().or(z.literal('')),
+  whatsapp: z.string().nullable().optional().or(z.literal('')),
+  email: z.string().email('Invalid email').nullable().optional().or(z.literal('')),
+  birthdate: z.coerce.date().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 export const clientUpdateSchema = clientCreateSchema.partial();

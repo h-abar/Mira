@@ -4,22 +4,25 @@ import { isArabicText, isLatinText } from '../../utils/languageValidation';
 export const productCreateSchema = z.object({
   nameAr: z
     .string()
+    .trim()
     .min(1, 'Arabic name is required')
     .refine(isArabicText, 'Arabic name must be written in Arabic letters'),
   nameEn: z
     .string()
+    .trim()
     .min(1, 'English name is required')
     .refine(isLatinText, 'English name must be written in English letters'),
-  barcode: z.string().optional(),
-  category: z.string().min(1, 'Category is required'),
-  quantity: z.number().int().nonnegative().default(0),
+  barcode: z.string().nullable().optional().or(z.literal('')),
+  category: z.string().trim().min(1, 'Category is required'),
+  quantity: z.coerce.number().int().nonnegative().default(0),
   unit: z.string().default('pcs'),
-  costPrice: z.number().nonnegative().default(0),
-  salePrice: z.number().nonnegative().default(0),
-  minStock: z.number().int().nonnegative().default(0),
-  supplier: z.string().optional(),
-  branchId: z.number().int().positive().nullable().optional(),
-  isActive: z.boolean().optional(),
+  costPrice: z.coerce.number().nonnegative().default(0),
+  salePrice: z.coerce.number().nonnegative().default(0),
+  minStock: z.coerce.number().int().nonnegative().default(0),
+  supplier: z.string().nullable().optional().or(z.literal('')),
+  supplierId: z.coerce.number().int().positive().nullable().optional(),
+  branchId: z.coerce.number().int().positive().nullable().optional(),
+  isActive: z.boolean().optional().default(true),
 });
 
 export const productUpdateSchema = productCreateSchema.partial();

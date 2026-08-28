@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const giftCardCreateSchema = z.object({
   initialValue: z.number().positive('يجب أن تكون قيمة البطاقة أكبر من صفر'),
-  clientId: z.number().int().positive().optional(),
-  expiresAt: z.string().optional(),
+  clientId: z.number().int().positive().nullable().optional(),
+  expiresAt: z.string().nullable().optional().or(z.date()),
 });
 
 export const giftCardUpdateSchema = z.object({

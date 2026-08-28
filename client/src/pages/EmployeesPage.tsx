@@ -339,10 +339,10 @@ export default function EmployeesPage() {
       shiftStart: legacyStart,
       shiftEnd: legacyEnd,
       workDays: form.workDays.trim() || undefined,
-      morningStart: hasMorning ? form.morningStart : null as unknown as undefined,
-      morningEnd: hasMorning ? form.morningEnd : null as unknown as undefined,
-      eveningStart: hasEvening ? form.eveningStart : null as unknown as undefined,
-      eveningEnd: hasEvening ? form.eveningEnd : null as unknown as undefined,
+      morningStart: hasMorning ? form.morningStart : undefined,
+      morningEnd: hasMorning ? form.morningEnd : undefined,
+      eveningStart: hasEvening ? form.eveningStart : undefined,
+      eveningEnd: hasEvening ? form.eveningEnd : undefined,
     };
     if (!editing) {
       payload.isActive = true;

@@ -16,22 +16,25 @@ describe('containsLatin', () => {
 });
 
 describe('isArabicText', () => {
-  it('accepts pure Arabic and rejects empty, mixed or Latin-only input', () => {
+  it('accepts Arabic input and mixed text with Arabic, rejects Latin-only and empty input', () => {
     expect(isArabicText('شامبو')).toBe(true);
+    expect(isArabicText('شامبو Shampoo')).toBe(true);
+    expect(isArabicText('كيراتين 500ml')).toBe(true);
+    expect(isArabicText('Shampoo')).toBe(false);
     expect(isArabicText('')).toBe(false);
     expect(isArabicText('   ')).toBe(false);
-    expect(isArabicText('Shampoo')).toBe(false);
-    expect(isArabicText('شامبو Shampoo')).toBe(false);
     expect(isArabicText('123')).toBe(false);
   });
 });
 
 describe('isLatinText', () => {
-  it('accepts pure Latin and rejects empty, mixed or Arabic-only input', () => {
+  it('accepts Latin input and mixed text with Latin, rejects Arabic-only and empty input', () => {
     expect(isLatinText('Shampoo')).toBe(true);
-    expect(isLatinText('')).toBe(false);
+    expect(isLatinText('Shampoo شامبو')).toBe(true);
+    expect(isLatinText('Keratin 500ml')).toBe(true);
     expect(isLatinText('شامبو')).toBe(false);
-    expect(isLatinText('Shampoo شامبو')).toBe(false);
+    expect(isLatinText('')).toBe(false);
+    expect(isLatinText('   ')).toBe(false);
     expect(isLatinText('123')).toBe(false);
   });
 });

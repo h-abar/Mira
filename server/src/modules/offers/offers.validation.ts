@@ -9,17 +9,19 @@ export const offerCreateSchema = z.object({
     .transform((code) => code.toUpperCase()),
   nameAr: z
     .string()
+    .trim()
     .min(1, 'Arabic name is required')
     .refine(isArabicText, 'Arabic name must be written in Arabic letters'),
   nameEn: z
     .string()
+    .trim()
     .min(1, 'English name is required')
     .refine(isLatinText, 'English name must be written in English letters'),
   discountType: z.enum(['PERCENT', 'FIXED']),
-  value: z.number().positive('Value must be a positive number'),
-  validFrom: z.coerce.date().optional(),
-  validTo: z.coerce.date().optional(),
-  minTotal: z.number().nonnegative().optional().default(0),
+  value: z.coerce.number().positive('Value must be a positive number'),
+  validFrom: z.coerce.date().nullable().optional(),
+  validTo: z.coerce.date().nullable().optional(),
+  minTotal: z.coerce.number().nonnegative().optional().default(0),
   isActive: z.boolean().optional().default(true),
 });
 

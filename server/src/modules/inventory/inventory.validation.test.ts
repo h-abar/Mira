@@ -31,12 +31,9 @@ describe('productCreateSchema', () => {
     expect(result.data?.quantity).toBe(0);
   });
 
-  it('rejects Arabic name that is not Arabic text', () => {
+  it('rejects Arabic name that contains no Arabic letters', () => {
     expect(
       productCreateSchema.safeParse({ nameAr: 'Shampoo', nameEn: 'Shampoo', category: 'C' }).success,
-    ).toBe(false);
-    expect(
-      productCreateSchema.safeParse({ nameAr: 'شامبو Shampoo', nameEn: 'Shampoo', category: 'C' }).success,
     ).toBe(false);
   });
 
