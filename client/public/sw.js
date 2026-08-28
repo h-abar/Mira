@@ -1,5 +1,5 @@
 // Cache version — bump this string whenever you deploy to force all clients to get fresh code.
-const CACHE_NAME = 'mira-v4';
+const CACHE_NAME = 'mira-v5';
 const APP_SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
   // Navigation requests: always try network first so users always get the latest HTML.
   // Fall back to cache only when completely offline.
@@ -34,7 +34,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
           return response;
         })
-        .catch(() => caches.match('/') ?? fetch(request)),
+        .catch(() => caches.match('/').then((cached) => cached ?? Response.error())),
     );
     return;
   }

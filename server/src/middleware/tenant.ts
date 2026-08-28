@@ -8,12 +8,14 @@ import { tenantStorage } from '../multi-tenancy/tenantContext';
 const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'admin', 'app', 'localhost']);
 
 function extractSlug(req: Request): string | null {
+  const host = (req.headers.host ?? '').split(':')[0].toLowerCase();
+  if (host.endsWith('.up.railway.app')) return null;
+
   const header = req.headers['x-tenant'];
   if (typeof header === 'string' && header.trim() !== '') {
     return header.trim().toLowerCase();
   }
 
-  const host = (req.headers.host ?? '').split(':')[0].toLowerCase();
   const parts = host.split('.');
   // salon-slug.example.com -> ['salon-slug','example','com']
   if (parts.length > 2 && !RESERVED_SUBDOMAINS.has(parts[0]) && parts[0] !== '') {

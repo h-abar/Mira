@@ -143,7 +143,7 @@ export async function createTenant(input: CreateTenantInput): Promise<{ slug: st
 
   // 3) Seed admin user + defaults
   const adminUsername = (input.adminUsername ?? 'admin').trim().toLowerCase();
-  const adminPassword = input.adminPassword ?? 'admin123';
+  const adminPassword = input.adminPassword ?? 'admin1234';
   await seedTenantData(dbName, adminUsername, adminPassword);
 
   // 4) Register in the master registry

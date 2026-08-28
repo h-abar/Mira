@@ -15,10 +15,15 @@ export interface ApiError {
  * Reserved names are ignored so the platform itself uses the default workspace.
  */
 export function resolveTenantSlug(): string | null {
+  const host = window.location.hostname.toLowerCase();
+  if (host.endsWith('.up.railway.app')) {
+    localStorage.removeItem(TENANT_KEY);
+    return null;
+  }
+
   const stored = localStorage.getItem(TENANT_KEY);
   if (stored) return stored;
 
-  const host = window.location.hostname.toLowerCase();
   const parts = host.split('.');
   const reserved = new Set(['www', 'api', 'admin', 'app', 'localhost', '127', '0']);
   if (parts.length > 2 && !reserved.has(parts[0]) && parts[0] !== '') {
