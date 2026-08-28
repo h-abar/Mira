@@ -1,5 +1,5 @@
 // Cache version — bump this string whenever you deploy to force all clients to get fresh code.
-const CACHE_NAME = 'mira-v3';
+const CACHE_NAME = 'mira-v4';
 const APP_SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
