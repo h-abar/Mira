@@ -34,6 +34,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PrintIcon from '@mui/icons-material/Print';
 import CoffeeIcon from '@mui/icons-material/Coffee';
 import StarIcon from '@mui/icons-material/Star';
+import CardMembershipIcon from '@mui/icons-material/CardMembership';
 import { listServices, type Service } from '../api/services';
 import { listProducts, type Product } from '../api/inventory';
 import { createClient, listClients, type Client } from '../api/clients';
@@ -45,6 +46,7 @@ import {
   type Invoice,
   type PaymentMethod,
 } from '../api/accounting';
+import { getActiveMembership, type ActiveMembership } from '../api/memberships';
 import { createPayment } from '../api/payments';
 import { sendWhatsApp } from '../api/notifications';
 import { getSettings } from '../api/settings';
@@ -86,6 +88,13 @@ const L = {
     pointsUnit: 'نقطة',
     redeemValueHint: 'خصم',
     loyaltyPoints: 'نقاط الولاء',
+    membership: 'العضوية',
+    membershipDiscount: 'خصم العضوية',
+    membershipActive: 'عضوية نشطة',
+    membershipExpiry: 'تنتهي خلال',
+    membershipDays: 'يوم',
+    membershipAllServices: 'كل الخدمات',
+    membershipSpecificServices: 'خدمات محددة',
     searchClientHint: 'ابحث بالاسم أو رقم الهاتف',
     offerCode: 'كود العرض / الكوبون',
     redeemPoints: 'نقاط للاستبدال',
@@ -166,6 +175,13 @@ const L = {
     pointsUnit: 'pts',
     redeemValueHint: 'discount',
     loyaltyPoints: 'Loyalty points',
+    membership: 'Membership',
+    membershipDiscount: 'Membership discount',
+    membershipActive: 'Active membership',
+    membershipExpiry: 'Expires in',
+    membershipDays: 'days',
+    membershipAllServices: 'All services',
+    membershipSpecificServices: 'Specific services',
     searchClientHint: 'Search by name or phone number',
     offerCode: 'Offer / Coupon code',
     redeemPoints: 'Points to redeem',
@@ -268,6 +284,7 @@ export default function POSPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [activeMembership, setActiveMembership] = useState<ActiveMembership | null>(null);
   const [employeeId, setEmployeeId] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [bankReference, setBankReference] = useState('');
@@ -379,6 +396,26 @@ export default function POSPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBranchId]);
 
+  // Fetch active membership when client changes
+  useEffect(() => {
+    let active = true;
+    if (!selectedClient) {
+      setActiveMembership(null);
+      return;
+    }
+    (async () => {
+      try {
+        const membership = await getActiveMembership(selectedClient.id);
+        if (active) setActiveMembership(membership);
+      } catch {
+        if (active) setActiveMembership(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [selectedClient]);
+
   const serviceCategories = useMemo(
     () => Array.from(new Set(services.map((s) => s.category))),
     [services],
@@ -443,6 +480,22 @@ export default function POSPage() {
 
   const [taxEnabled, setTaxEnabled] = useState(true);
   const subtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+  // Compute membership discount for current cart
+  const membershipDiscountAmount = useMemo(() => {
+    if (!activeMembership || cart.length === 0) return 0;
+    const pct = Number(activeMembership.plan.discountPercent) || 0;
+    if (pct <= 0) return 0;
+    const planServiceIds = activeMembership.plan.serviceIds ?? [];
+    if (planServiceIds.length === 0) {
+      return Math.round((subtotal * pct) / 100 * 100) / 100;
+    }
+    const coveredTotal = cart
+      .filter((c) => c.kind === 'service' && planServiceIds.includes(c.id))
+      .reduce((sum, c) => sum + c.unitPrice * c.quantity, 0);
+    return Math.round((coveredTotal * pct) / 100 * 100) / 100;
+  }, [activeMembership, cart, subtotal]);
+
   const discountNum = Number(discount) || 0;
   const taxableBase = Math.max(subtotal - discountNum, 0);
   const taxNum = taxEnabled ? Math.round(taxableBase * vatRate) / 100 : 0;
@@ -1010,6 +1063,53 @@ export default function POSPage() {
                 )}
                 <Typography variant="caption" sx={{ width: '100%', opacity: 0.85 }}>
                   {l.willEarn}: ≈ {willEarn} {l.pointsUnit}
+                </Typography>
+              </Paper>
+            )}
+
+            {selectedClient && activeMembership && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexWrap: 'wrap',
+                  bgcolor: 'success.main',
+                  color: 'success.contrastText',
+                  borderRadius: 2,
+                }}
+              >
+                <CardMembershipIcon sx={{ fontSize: 34, opacity: 0.9 }} />
+                <Box>
+                  <Typography variant="h6" fontWeight={800} lineHeight={1.1}>
+                    {lang === 'ar' ? activeMembership.plan.nameAr : activeMembership.plan.nameEn}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                    {l.membershipActive} — {l.membershipExpiry} {activeMembership.remainingDays} {l.membershipDays}
+                  </Typography>
+                </Box>
+                <Box sx={{ ml: 'auto', textAlign: 'center' }}>
+                  <Typography variant="h6" fontWeight={800}>
+                    {Number(activeMembership.plan.discountPercent) || 0}%
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                    {l.membershipDiscount}
+                  </Typography>
+                </Box>
+                {membershipDiscountAmount > 0 && (
+                  <Chip
+                    label={`${l.membershipDiscount}: ${membershipDiscountAmount.toFixed(2)}`}
+                    size="small"
+                    sx={{ bgcolor: '#fff', color: 'success.main', fontWeight: 700 }}
+                    onClick={() => setDiscount(String(membershipDiscountAmount.toFixed(2)))}
+                  />
+                )}
+                <Typography variant="caption" sx={{ width: '100%', opacity: 0.85 }}>
+                  {(activeMembership.plan.serviceIds ?? []).length === 0
+                    ? l.membershipAllServices
+                    : `${l.membershipSpecificServices}: ${(activeMembership.plan.serviceIds ?? []).length}`}
                 </Typography>
               </Paper>
             )}

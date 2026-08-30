@@ -258,6 +258,9 @@ model Invoice {
   paymentMethod  PaymentMethod @default(CASH)
   bankReference  String?
   bankName       String?
+  membershipPlanId  Int?
+  membershipPlan    MembershipPlan? @relation(fields: [membershipPlanId], references: [id], onDelete: SetNull)
+  membershipDiscount Decimal       @default(0) @db.Decimal(10, 2)
   status         InvoiceStatus @default(PAID)
   createdAt      DateTime      @default(now())
   items          InvoiceItem[]
@@ -465,15 +468,17 @@ model Notification {
 }
 
 model MembershipPlan {
-  id           Int                 @id @default(autoincrement())
-  nameAr       String
-  nameEn       String
-  price        Decimal             @db.Decimal(10, 2)
-  durationDays Int                 @default(30)
-  serviceIds   Int[]               @default([])
-  isActive     Boolean             @default(true)
-  createdAt    DateTime            @default(now())
-  memberships  ClientMembership[]
+  id              Int                 @id @default(autoincrement())
+  nameAr          String
+  nameEn          String
+  price           Decimal             @db.Decimal(10, 2)
+  durationDays    Int                 @default(30)
+  serviceIds      Int[]               @default([])
+  discountPercent Decimal             @default(0) @db.Decimal(5, 2)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  memberships     ClientMembership[]
+  invoices        Invoice[]
 
   @@map("membership_plans")
 }

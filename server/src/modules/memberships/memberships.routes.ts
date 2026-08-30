@@ -18,6 +18,10 @@ function validate(schema: z.ZodTypeAny) {
 }
 
 router.use(auth);
+
+// Active membership lookup is available to any authenticated user (needed by POS/appointments)
+router.get('/client/:clientId', membershipsController.getClientMembership);
+
 router.use(requirePermission('memberships'));
 
 router.get('/plans', membershipsController.listPlans);

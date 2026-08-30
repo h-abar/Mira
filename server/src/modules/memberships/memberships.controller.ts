@@ -1,5 +1,6 @@
 ﻿import { NextFunction, Request, Response } from 'express';
 import { membershipsService } from './memberships.service';
+import { getActiveMembership } from './membershipDiscount';
 import { ApiError } from '../../utils/ApiError';
 
 async function listPlans(_req: Request, res: Response, next: NextFunction) {
@@ -70,6 +71,44 @@ async function cancelMembership(req: Request, res: Response, next: NextFunction)
   }
 }
 
+async function getClientMembership(req: Request, res: Response, next: NextFunction) {
+  try {
+    const clientId = Number(req.params.clientId);
+    if (!Number.isInteger(clientId)) {
+      throw new ApiError(400, 'Invalid client id.');
+    }
+    const membership = await getActiveMembership(clientId);
+    const now = new Date();
+    const remainingDays = membership
+      ? Math.max(0, Math.ceil((new Date(membership.endDate).getTime() - now.getTime()) / 86400000))
+      : 0;
+    res.json({
+      success: true,
+      data: membership
+        ? {
+            id: membership.id,
+            clientId: membership.clientId,
+            planId: membership.planId,
+            startDate: membership.startDate,
+            endDate: membership.endDate,
+            status: membership.status,
+            remainingDays,
+            plan: {
+              id: membership.plan.id,
+              nameAr: membership.plan.nameAr,
+              nameEn: membership.plan.nameEn,
+              discountPercent: Number(membership.plan.discountPercent),
+              serviceIds: membership.plan.serviceIds,
+              durationDays: membership.plan.durationDays,
+            },
+          }
+        : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const membershipsController = {
   listPlans,
   createPlan,
@@ -78,4 +117,5 @@ export const membershipsController = {
   assign,
   listMemberships,
   cancelMembership,
+  getClientMembership,
 };

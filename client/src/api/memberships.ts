@@ -7,6 +7,7 @@ export interface MembershipPlan {
   price: string | number;
   durationDays: number;
   serviceIds: number[];
+  discountPercent: string | number;
   isActive: boolean;
   createdAt: string;
   membersCount?: number;
@@ -31,6 +32,25 @@ export interface PlanInput {
   price: number;
   durationDays: number;
   serviceIds?: number[];
+  discountPercent?: number;
+}
+
+export interface ActiveMembership {
+  id: number;
+  clientId: number;
+  planId: number;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  remainingDays: number;
+  plan: {
+    id: number;
+    nameAr: string;
+    nameEn: string;
+    discountPercent: number;
+    serviceIds: number[];
+    durationDays: number;
+  };
 }
 
 const unwrap = <T>(response: { success: boolean; data: T }): T => response.data;
@@ -58,4 +78,9 @@ export const assignMembership = (clientId: number, planId: number) =>
 export const cancelMembership = (id: number) =>
   api
     .post<{ success: boolean; data: ClientMembership }>(`/memberships/${id}/cancel`)
+    .then(unwrap);
+
+export const getActiveMembership = (clientId: number) =>
+  api
+    .get<{ success: boolean; data: ActiveMembership | null }>(`/memberships/client/${clientId}`)
     .then(unwrap);

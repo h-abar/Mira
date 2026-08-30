@@ -57,6 +57,7 @@ const L = {
     nameEn: 'الاسم (إنجليزي)',
     price: 'السعر',
     durationDays: 'المدة (أيام)',
+    discountPercent: 'نسبة الخصم %',
     services: 'الخدمات المشمولة',
     save: 'حفظ',
     cancel: 'إلغاء',
@@ -97,6 +98,7 @@ const L = {
     nameEn: 'Name (English)',
     price: 'Price',
     durationDays: 'Duration (days)',
+    discountPercent: 'Discount %',
     services: 'Included Services',
     save: 'Save',
     cancel: 'Cancel',
@@ -147,6 +149,7 @@ interface PlanForm {
   nameEn: string;
   price: string;
   durationDays: string;
+  discountPercent: string;
   serviceIds: number[];
 }
 
@@ -155,6 +158,7 @@ const emptyPlanForm = (): PlanForm => ({
   nameEn: '',
   price: '',
   durationDays: '30',
+  discountPercent: '0',
   serviceIds: [],
 });
 
@@ -232,6 +236,7 @@ export default function MembershipsPage() {
             nameEn: editing.nameEn,
             price: String(Number(editing.price)),
             durationDays: String(editing.durationDays),
+            discountPercent: String(Number(editing.discountPercent) || 0),
             serviceIds: editing.serviceIds ?? [],
           }
         : emptyPlanForm(),
@@ -259,6 +264,7 @@ export default function MembershipsPage() {
       nameEn: planForm.nameEn.trim(),
       price,
       durationDays,
+      discountPercent: Number(planForm.discountPercent) || 0,
       serviceIds: planForm.serviceIds,
     };
 
@@ -327,6 +333,12 @@ export default function MembershipsPage() {
       renderCell: (params) => formatMoney(params.value),
     },
     { field: 'durationDays', headerName: l.durationDays, width: 110 },
+    {
+      field: 'discountPercent',
+      headerName: l.discountPercent,
+      width: 110,
+      renderCell: (params) => `${Number(params.value) || 0}%`,
+    },
     {
       field: 'membersCount',
       headerName: l.members,
@@ -514,6 +526,15 @@ export default function MembershipsPage() {
               onChange={(e) => setPlanForm({ ...planForm, durationDays: e.target.value })}
               error={!!planErrors.durationDays}
               helperText={planErrors.durationDays}
+              fullWidth
+            />
+            <TextField
+              label={l.discountPercent}
+              type="number"
+              inputProps={{ min: 0, max: 100, step: '0.01' }}
+              value={planForm.discountPercent}
+              onChange={(e) => setPlanForm({ ...planForm, discountPercent: e.target.value })}
+              helperText={lang === 'ar' ? 'نسبة الخصم عند الفوترة (0 = لا خصم)' : 'Discount applied at invoicing (0 = no discount)'}
               fullWidth
             />
             <FormControl fullWidth>

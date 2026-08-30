@@ -8,6 +8,7 @@ export interface PlanCreateInput {
   price: number;
   durationDays: number;
   serviceIds: number[];
+  discountPercent?: number;
 }
 
 export interface AssignInput {
@@ -37,6 +38,7 @@ async function createPlan(data: PlanCreateInput) {
       price: data.price,
       durationDays: data.durationDays,
       serviceIds: data.serviceIds ?? [],
+      discountPercent: data.discountPercent ?? 0,
     },
   });
 }
@@ -54,6 +56,7 @@ async function updatePlan(id: number, data: Partial<PlanCreateInput>) {
       ...(data.price !== undefined ? { price: data.price } : {}),
       ...(data.durationDays !== undefined ? { durationDays: data.durationDays } : {}),
       ...(data.serviceIds !== undefined ? { serviceIds: data.serviceIds } : {}),
+      ...(data.discountPercent !== undefined ? { discountPercent: data.discountPercent } : {}),
     },
   });
 }

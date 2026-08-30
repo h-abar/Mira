@@ -36,6 +36,9 @@ export interface Invoice {
   paymentMethod: PaymentMethod;
   bankReference?: string | null;
   bankName?: string | null;
+  membershipPlanId?: number | null;
+  membershipDiscount?: string | number;
+  membershipPlan?: { id: number; nameAr: string; nameEn: string } | null;
   status: InvoiceStatus;
   client?: { id: number; name: string; phone?: string | null } | null;
   employee?: Employee | null;

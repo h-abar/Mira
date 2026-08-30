@@ -7,6 +7,7 @@ import {
   redeemPointsForInvoice,
 } from '../loyalty/loyalty.service';
 import { validateOffer } from '../offers/offers.service';
+import { computeMembershipDiscount } from '../memberships/membershipDiscount';
 
 type PaymentMethod = 'CASH' | 'CARD' | 'WALLET' | 'ELECTRONIC' | 'BANK_TRANSFER';
 
@@ -114,6 +115,7 @@ const invoiceIncludes = {
   client: true,
   employee: true,
   items: { include: { service: true, product: true } },
+  membershipPlan: true,
 } satisfies Prisma.InvoiceInclude;
 
 async function findActiveShiftSession(employeeId?: number): Promise<number | null> {
@@ -138,6 +140,9 @@ interface OfferAndRedeemResult {
   tip: number;
   giftCardUsed: number;
   giftCardId: number | null;
+  membershipDiscount: number;
+  membershipPlanId: number | null;
+  membershipPlanName: string | null;
 }
 
 async function applyOfferAndRedeem(input: {
@@ -149,9 +154,22 @@ async function applyOfferAndRedeem(input: {
   offerCode?: string;
   redeemPoints?: number;
   giftCardCode?: string;
+  serviceIds?: number[];
+  servicePrices?: Map<number, number>;
 }): Promise<OfferAndRedeemResult> {
   let { discount } = input;
   let offerCode: string | undefined;
+
+  // Apply membership discount first (on subtotal before other discounts)
+  const membershipResult = await computeMembershipDiscount(
+    input.clientId,
+    input.subtotal,
+    input.serviceIds ?? [],
+    input.servicePrices ?? new Map(),
+  );
+  if (membershipResult.discount > 0) {
+    discount = round2(discount + membershipResult.discount);
+  }
 
   if (input.offerCode) {
     const offerResult = await validateOffer(input.offerCode, input.subtotal);
@@ -202,7 +220,18 @@ async function applyOfferAndRedeem(input: {
     total = 0;
   }
 
-  return { discount, total, offerCode, pointsRedeemed, tip, giftCardUsed, giftCardId };
+  return {
+    discount,
+    total,
+    offerCode,
+    pointsRedeemed,
+    tip,
+    giftCardUsed,
+    giftCardId,
+    membershipDiscount: membershipResult.discount,
+    membershipPlanId: membershipResult.membershipPlanId,
+    membershipPlanName: membershipResult.membershipPlanName,
+  };
 }
 
 async function createInvoiceFromAppointment(input: AppointmentInvoiceInput) {
@@ -230,6 +259,8 @@ async function createInvoiceFromAppointment(input: AppointmentInvoiceInput) {
     offerCode: input.offerCode,
     redeemPoints: input.redeemPoints,
     giftCardCode: input.giftCardCode,
+    serviceIds: [appointment.serviceId],
+    servicePrices: new Map([[appointment.serviceId, unitPrice]]),
   });
   const invoiceNo = generateInvoiceNo(new Date());
   const shiftSessionId = await findActiveShiftSession(appointment.employeeId);
@@ -254,6 +285,8 @@ async function createInvoiceFromAppointment(input: AppointmentInvoiceInput) {
         paymentMethod: input.paymentMethod,
         bankReference: input.bankReference ?? null,
         bankName: input.bankName ?? null,
+        membershipPlanId: offerAndRedeem.membershipPlanId,
+        membershipDiscount: offerAndRedeem.membershipDiscount,
         status: 'PAID',
         items: {
           create: [
@@ -434,6 +467,22 @@ async function createInvoiceManual(input: ManualInvoiceInput) {
 
   const subtotalValue = round2(subtotal);
   const tax = round2(Number(input.tax) || 0);
+
+  // Build serviceIds and servicePrices for membership discount calculation
+  const membershipServiceIds: number[] = [];
+  const membershipServicePrices = new Map<number, number>();
+  for (const raw of input.items) {
+    if (raw.serviceId) {
+      const service = serviceMap.get(raw.serviceId);
+      if (service) {
+        const unitPrice = round2(Number(raw.unitPrice ?? service.price));
+        const lineTotal = round2(unitPrice * Number(raw.quantity));
+        membershipServiceIds.push(raw.serviceId);
+        membershipServicePrices.set(raw.serviceId, (membershipServicePrices.get(raw.serviceId) ?? 0) + lineTotal);
+      }
+    }
+  }
+
   const offerAndRedeem = await applyOfferAndRedeem({
     clientId: input.clientId,
     subtotal: subtotalValue,
@@ -443,6 +492,8 @@ async function createInvoiceManual(input: ManualInvoiceInput) {
     offerCode: input.offerCode,
     redeemPoints: input.redeemPoints,
     giftCardCode: input.giftCardCode,
+    serviceIds: membershipServiceIds,
+    servicePrices: membershipServicePrices,
   });
   const invoiceNo = generateInvoiceNo(new Date());
   const shiftSessionId = await findActiveShiftSession(input.employeeId);
@@ -467,6 +518,8 @@ async function createInvoiceManual(input: ManualInvoiceInput) {
         paymentMethod: input.paymentMethod,
         bankReference: input.bankReference ?? null,
         bankName: input.bankName ?? null,
+        membershipPlanId: offerAndRedeem.membershipPlanId,
+        membershipDiscount: offerAndRedeem.membershipDiscount,
         status: 'PAID',
         items: { create: itemRows },
       },

@@ -47,6 +47,7 @@ import TableRowsIcon from '@mui/icons-material/TableRows';
 import PrintIcon from '@mui/icons-material/Print';
 import PaidIcon from '@mui/icons-material/Paid';
 import StarIcon from '@mui/icons-material/Star';
+import CardMembershipIcon from '@mui/icons-material/CardMembership';
 import { type ApiError } from '../api/client';
 import { createInvoiceFromAppointment, type Invoice } from '../api/accounting';
 import { createPayment } from '../api/payments';
@@ -68,6 +69,7 @@ import {
 } from '../api/appointments';
 import { listEmployees, type Employee } from '../api/employees';
 import { listClients, type Client } from '../api/clients';
+import { getActiveMembership, type ActiveMembership } from '../api/memberships';
 import { getSettings } from '../api/settings';
 import { listServices, type Service } from '../api/services';
 import { useAuthStore } from '../stores/authStore';
@@ -866,6 +868,7 @@ export default function AppointmentsPage() {
   const [invoiceTarget, setInvoiceTarget] = useState<Appointment | null>(null);
   const [invRedeem, setInvRedeem] = useState('');
   const [invBusy, setInvBusy] = useState(false);
+  const [invoiceMembership, setInvoiceMembership] = useState<ActiveMembership | null>(null);
   const [salonName, setSalonName] = useState('MIRA');
   const [logoUrl, setLogoUrl] = useState('');
   const [vatNumber, setVatNumber] = useState(ZATCA_VAT_NUMBER);
@@ -1117,9 +1120,16 @@ export default function AppointmentsPage() {
   };
 
   // Open the invoice dialog (with optional loyalty redemption) for an appointment.
-  const openInvoiceDialog = (appointment: Appointment) => {
+  const openInvoiceDialog = async (appointment: Appointment) => {
     setInvoiceTarget(appointment);
     setInvRedeem('');
+    setInvoiceMembership(null);
+    try {
+      const membership = await getActiveMembership(appointment.clientId);
+      setInvoiceMembership(membership);
+    } catch {
+      // ignore — membership is optional info
+    }
   };
 
   // Create an invoice from the appointment and open the thermal receipt.
@@ -2029,6 +2039,36 @@ export default function AppointmentsPage() {
                   </Typography>
                 </Box>
               </Box>
+              {invoiceMembership && Number(invoiceMembership.plan.discountPercent) > 0 && (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    bgcolor: 'success.main',
+                    color: 'success.contrastText',
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <CardMembershipIcon />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body1" fontWeight={800}>
+                      {lang === 'ar' ? invoiceMembership.plan.nameAr : invoiceMembership.plan.nameEn}
+                    </Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                      {lang === 'ar' ? 'عضوية نشطة' : 'Active membership'} —{' '}
+                      {Number(invoiceMembership.plan.discountPercent)}%{' '}
+                      {lang === 'ar' ? 'خصم' : 'discount'}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                    {lang === 'ar' ? 'تنتهي خلال' : 'Expires in'} {invoiceMembership.remainingDays}{' '}
+                    {lang === 'ar' ? 'يوم' : 'days'}
+                  </Typography>
+                </Box>
+              )}
               {invoiceTargetPoints > 0 && (
                 <>
                   <TextField

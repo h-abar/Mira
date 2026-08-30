@@ -6,6 +6,7 @@ export const planCreateSchema = z.object({
   price: z.number().positive('يجب أن يكون السعر أكبر من صفر'),
   durationDays: z.number().int().positive('يجب أن تكون المدة أياماً صحيحة'),
   serviceIds: z.array(z.number().int()).optional().default([]),
+  discountPercent: z.coerce.number().min(0).max(100).default(0),
 });
 
 export const planUpdateSchema = planCreateSchema.partial();
