@@ -270,6 +270,7 @@ const paymentLabelsEn: Record<PaymentMethod, string> = {
   CARD: 'Card',
   WALLET: 'Wallet',
   ELECTRONIC: 'Electronic',
+  BANK_TRANSFER: 'Bank Transfer',
 };
 
 const paymentLabelsAr: Record<PaymentMethod, string> = {
@@ -277,6 +278,7 @@ const paymentLabelsAr: Record<PaymentMethod, string> = {
   CARD: 'بطاقة',
   WALLET: 'محفظة',
   ELECTRONIC: 'دفع إلكتروني',
+  BANK_TRANSFER: 'تحويل بنكي',
 };
 
 const statusLabelsEn: Record<Invoice['status'], string> = {

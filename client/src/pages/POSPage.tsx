@@ -38,8 +38,10 @@ import { listServices, type Service } from '../api/services';
 import { listProducts, type Product } from '../api/inventory';
 import { createClient, listClients, type Client } from '../api/clients';
 import { listEmployees, type Employee } from '../api/employees';
+import { type ApiError } from '../api/client';
 import {
   createInvoiceManual,
+  cancelInvoice,
   type Invoice,
   type PaymentMethod,
 } from '../api/accounting';
@@ -66,6 +68,9 @@ const L = {
     card: 'بطاقة',
     wallet: 'محفظة',
     electronicPay: 'دفع إلكتروني',
+    bankTransfer: 'تحويل بنكي',
+    bankReference: 'رقم مرجع التحويل',
+    bankName: 'اسم البنك',
     electronicPaySimulated: 'تمت محاكاة الدفع الإلكتروني',
     discount: 'الخصم',
     tax: 'الضريبة',
@@ -120,6 +125,10 @@ const L = {
     save: 'حفظ',
     cancel: 'إلغاء',
     done: 'تم',
+    cancelInvoice: 'إلغاء الفاتورة',
+    cancelReason: 'سبب الإلغاء (اختياري)',
+    cancelConfirm: 'هل أنت متأكد من إلغاء هذه الفاتورة؟ سيتم استرجاع المبلغ للعميلة وعكس النقاط والمخزون.',
+    invoiceCancelled: 'تم إلغاء الفاتورة بنجاح',
     error: 'حدث خطأ',
     loading: 'جاري التحميل...',
     requiredClient: 'يرجى اختيار العميلة',
@@ -139,6 +148,9 @@ const L = {
     card: 'Card',
     wallet: 'Wallet',
     electronicPay: 'Electronic',
+    bankTransfer: 'Bank Transfer',
+    bankReference: 'Bank reference no.',
+    bankName: 'Bank name',
     electronicPaySimulated: 'Electronic payment simulated',
     discount: 'Discount',
     tax: 'Tax',
@@ -193,6 +205,10 @@ const L = {
     save: 'Save',
     cancel: 'Cancel',
     done: 'Done',
+    cancelInvoice: 'Cancel Invoice',
+    cancelReason: 'Cancellation reason (optional)',
+    cancelConfirm: 'Are you sure you want to cancel this invoice? The amount will be refunded to the client and points/stock will be reversed.',
+    invoiceCancelled: 'Invoice cancelled successfully',
     error: 'Something went wrong',
     loading: 'Loading...',
     requiredClient: 'Please select a client',
@@ -201,7 +217,7 @@ const L = {
   },
 } as const;
 
-const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'CARD', 'WALLET', 'ELECTRONIC'];
+const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'CARD', 'WALLET', 'ELECTRONIC', 'BANK_TRANSFER'];
 
 interface CartItem {
   key: string;
@@ -254,6 +270,8 @@ export default function POSPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [employeeId, setEmployeeId] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [bankReference, setBankReference] = useState('');
+  const [bankName, setBankName] = useState('');
   const [discount, setDiscount] = useState('');
   const [offerCode, setOfferCode] = useState('');
   const [redeemPoints, setRedeemPoints] = useState('');
@@ -268,6 +286,9 @@ export default function POSPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [successInvoice, setSuccessInvoice] = useState<Invoice | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelBox, setShowCancelBox] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' } | null>(
@@ -526,6 +547,8 @@ export default function POSPage() {
         offerCode: offerCode.trim() || undefined,
         redeemPoints: Number(redeemPoints) > 0 ? Number(redeemPoints) : undefined,
         giftCardCode: giftCardCode.trim() || undefined,
+        bankReference: paymentMethod === 'BANK_TRANSFER' ? bankReference.trim() || undefined : undefined,
+        bankName: paymentMethod === 'BANK_TRANSFER' ? bankName.trim() || undefined : undefined,
         items: cart.map((item) => ({
           serviceId: item.kind === 'service' ? item.id : undefined,
           productId: item.kind === 'product' ? item.id : undefined,
@@ -728,6 +751,7 @@ export default function POSPage() {
     CARD: l.card,
     WALLET: l.wallet,
     ELECTRONIC: l.electronicPay,
+    BANK_TRANSFER: l.bankTransfer,
   };
 
   return (
@@ -844,6 +868,25 @@ export default function POSPage() {
                   ))}
                 </Select>
               </FormControl>
+
+              {paymentMethod === 'BANK_TRANSFER' && (
+                <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1} sx={{ width: { xs: '100%', lg: 320 } }}>
+                  <TextField
+                    size="small"
+                    label={l.bankName}
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    size="small"
+                    label={l.bankReference}
+                    value={bankReference}
+                    onChange={(e) => setBankReference(e.target.value)}
+                    sx={{ flex: 1 }}
+                  />
+                </Stack>
+              )}
 
               <TextField
                 size="small"
@@ -1355,6 +1398,26 @@ export default function POSPage() {
                     </Typography>
                   </Box>
                 )}
+                {successInvoice.paymentMethod === 'BANK_TRANSFER' && (
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2">{l.paymentMethod}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{l.bankTransfer}</Typography>
+                    </Box>
+                    {successInvoice.bankName && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2">{l.bankName}</Typography>
+                        <Typography variant="body2" fontWeight={600}>{successInvoice.bankName}</Typography>
+                      </Box>
+                    )}
+                    {successInvoice.bankReference && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2">{l.bankReference}</Typography>
+                        <Typography variant="body2" fontWeight={600}>{successInvoice.bankReference}</Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
               </>
             )}
             <Button
@@ -1385,7 +1448,58 @@ export default function POSPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSuccessInvoice(null)}>{l.done}</Button>
+          {showCancelBox ? (
+            <Stack spacing={1.5} sx={{ width: '100%', px: 2, pb: 1 }}>
+              <Alert severity="warning">{l.cancelConfirm}</Alert>
+              <TextField
+                size="small"
+                fullWidth
+                label={l.cancelReason}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+              <Stack direction="row" spacing={1}>
+                <Button
+                  disabled={cancelling}
+                  onClick={() => { setShowCancelBox(false); setCancelReason(''); }}
+                  sx={{ flex: 1 }}
+                >
+                  {l.cancel}
+                </Button>
+                <Button
+                  color="error"
+                  variant="contained"
+                  disabled={cancelling}
+                  sx={{ flex: 1 }}
+                  onClick={async () => {
+                    if (!successInvoice) return;
+                    setCancelling(true);
+                    try {
+                      await cancelInvoice(successInvoice.id, cancelReason.trim() || undefined);
+                      setSnack({ message: l.invoiceCancelled, severity: 'success' });
+                      setSuccessInvoice(null);
+                      setShowCancelBox(false);
+                      setCancelReason('');
+                    } catch (err) {
+                      setSnack({ message: (err as ApiError)?.message ?? l.error, severity: 'error' });
+                    } finally {
+                      setCancelling(false);
+                    }
+                  }}
+                >
+                  {cancelling ? '...' : l.cancelInvoice}
+                </Button>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+              <Button color="error" onClick={() => setShowCancelBox(true)}>
+                {l.cancelInvoice}
+              </Button>
+              <Box sx={{ flex: 1 }} />
+              <Button onClick={() => setSuccessInvoice(null)}>{l.done}</Button>
+            </Stack>
+          )}
         </DialogActions>
       </Dialog>
 

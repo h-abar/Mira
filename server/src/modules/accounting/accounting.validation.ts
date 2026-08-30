@@ -17,11 +17,13 @@ export const invoiceCreateSchema = z
     discount: z.coerce.number().nonnegative().default(0),
     tax: z.coerce.number().nonnegative().default(0),
     tip: z.coerce.number().nonnegative().optional(),
-    paymentMethod: z.enum(['CASH', 'CARD', 'WALLET', 'ELECTRONIC']).default('CASH'),
+    paymentMethod: z.enum(['CASH', 'CARD', 'WALLET', 'ELECTRONIC', 'BANK_TRANSFER']).default('CASH'),
     branchId: z.coerce.number().int().positive().optional(),
     offerCode: z.string().trim().optional(),
     redeemPoints: z.coerce.number().int().nonnegative().optional(),
     giftCardCode: z.string().trim().optional(),
+    bankReference: z.string().trim().optional(),
+    bankName: z.string().trim().optional(),
     items: z.array(invoiceItemSchema).optional(),
   })
   .superRefine((data, ctx) => {

@@ -50,6 +50,7 @@ export default function BookingPage() {
 
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<number | ''>('');
+  const [perServiceEmployee, setPerServiceEmployee] = useState<Record<number, number | ''>>({});
 
   const [date, setDate] = useState('');
   const [slots, setSlots] = useState<{ time: string; availableEmployeeId?: number; availableEmployeeName?: string }[]>([]);
@@ -124,7 +125,25 @@ export default function BookingPage() {
     setSelectedServices((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
+    setPerServiceEmployee((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     setSelectedTime('');
+  };
+
+  const setServiceEmployee = (serviceId: number, employeeId: number | '') => {
+    setPerServiceEmployee((prev) => ({ ...prev, [serviceId]: employeeId }));
+    setSelectedTime('');
+  };
+
+  // Effective employee per service: explicit assignment falls back to global preference
+  const effectiveEmployeeFor = (serviceId: number): number | undefined => {
+    const per = perServiceEmployee[serviceId];
+    if (per !== undefined && per !== '') return Number(per);
+    if (selectedEmployee !== '') return Number(selectedEmployee);
+    return undefined;
   };
 
   const fetchSlots = async () => {
@@ -132,10 +151,15 @@ export default function BookingPage() {
     try {
       setLoadingSlots(true);
       setSelectedTime('');
+      // Prefer the first explicit per-service employee; otherwise the global preference
+      const preferredEmployee =
+        selectedServices
+          .map((sid) => perServiceEmployee[sid])
+          .find((v) => v !== undefined && v !== '') ?? selectedEmployee;
       const res = await publicApi.getAvailableSlots(
         date,
         selectedServices,
-        selectedEmployee ? Number(selectedEmployee) : undefined,
+        preferredEmployee ? Number(preferredEmployee) : undefined,
       );
       setSlots(res.data ?? []);
     } catch {
@@ -150,7 +174,7 @@ export default function BookingPage() {
       fetchSlots();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, date, selectedEmployee]);
+  }, [step, date, selectedEmployee, perServiceEmployee]);
 
   const handleSubmit = async () => {
     if (!date || !selectedTime || selectedServices.length === 0) return;
@@ -163,7 +187,7 @@ export default function BookingPage() {
         employeeId: selectedEmployee ? Number(selectedEmployee) : undefined,
         items: selectedServices.map((sid) => ({
           serviceId: sid,
-          employeeId: selectedEmployee ? Number(selectedEmployee) : undefined,
+          employeeId: effectiveEmployeeFor(sid),
         })),
         date,
         startTime: selectedTime,
@@ -374,18 +398,25 @@ export default function BookingPage() {
 
               {step === 2 && (
                 <Box>
-                  <Typography variant="subtitle1" fontWeight={700} mb={2}>
-                    {isAr ? 'اختاري الخبيرة' : 'Choose your specialist'}
+                  <Typography variant="subtitle1" fontWeight={700} mb={1}>
+                    {isAr ? 'اختاري الخبيرة لكل خدمة' : 'Choose a specialist per service'}
                   </Typography>
+                  <Typography variant="caption" color="text.secondary" mb={2} display="block">
+                    {isAr
+                      ? 'يمكنكِ تعيين خبيرة مختلفة لكل خدمة، أو اختيار "أي خبيرة متاحة" لترك الأمر للصالون.'
+                      : 'You can assign a different specialist per service, or pick "Any available" to let the salon decide.'}
+                  </Typography>
+
+                  {/* Global preference (applies to services without an explicit choice) */}
                   <FormControl fullWidth sx={{ mb: 3 }}>
-                    <InputLabel>{isAr ? 'الخبيرة' : 'Specialist'}</InputLabel>
+                    <InputLabel>{isAr ? 'تفضيل عام (للخدمات بدون اختيار)' : 'General preference (for unselected)'}</InputLabel>
                     <Select
                       value={selectedEmployee}
-                      label={isAr ? 'الخبيرة' : 'Specialist'}
+                      label={isAr ? 'تفضيل عام (للخدمات بدون اختيار)' : 'General preference (for unselected)'}
                       onChange={(e) => setSelectedEmployee(e.target.value as number | '')}
                     >
                       <MenuItem value="">
-                        <em>{isAr ? 'بدون تفضيل (أي خبيرة متاحة)' : 'No preference (any available)'}</em>
+                        <em>{isAr ? 'أي خبيرة متاحة' : 'Any available'}</em>
                       </MenuItem>
                       {employees.map((emp) => (
                         <MenuItem key={emp.id} value={emp.id}>
@@ -394,7 +425,41 @@ export default function BookingPage() {
                       ))}
                     </Select>
                   </FormControl>
-                  <Stack direction="row" spacing={2}>
+
+                  <Divider sx={{ mb: 2 }} />
+
+                  {/* Per-service specialist selection */}
+                  <Stack spacing={2}>
+                    {selectedServiceObjects.map((s) => {
+                      const value = perServiceEmployee[s.id] ?? '';
+                      return (
+                        <Box key={s.id} sx={{ p: 2, borderRadius: '14px', border: '1px solid #f1f5f9', backgroundColor: '#fafafa' }}>
+                          <Typography fontWeight={700} mb={1}>
+                            {isAr ? s.nameAr : s.nameEn}
+                          </Typography>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>{isAr ? 'الخبيرة' : 'Specialist'}</InputLabel>
+                            <Select
+                              value={value}
+                              label={isAr ? 'الخبيرة' : 'Specialist'}
+                              onChange={(e) => setServiceEmployee(s.id, e.target.value as number | '')}
+                            >
+                              <MenuItem value="">
+                                <em>{isAr ? 'استخدام التفضيل العام' : 'Use general preference'}</em>
+                              </MenuItem>
+                              {employees.map((emp) => (
+                                <MenuItem key={emp.id} value={emp.id}>
+                                  {isAr ? emp.nameAr : emp.nameEn}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+
+                  <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
                     <Button variant="outlined" sx={{ borderRadius: '16px', flex: 1 }} onClick={() => setStep(1)}>
                       {isAr ? 'السابق' : 'Back'}
                     </Button>

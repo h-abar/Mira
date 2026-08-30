@@ -33,6 +33,7 @@ enum PaymentMethod {
   CARD
   WALLET
   ELECTRONIC
+  BANK_TRANSFER
 }
 
 enum InvoiceStatus {
@@ -255,6 +256,8 @@ model Invoice {
   pointsEarned   Int           @default(0)
   pointsRedeemed Int           @default(0)
   paymentMethod  PaymentMethod @default(CASH)
+  bankReference  String?
+  bankName       String?
   status         InvoiceStatus @default(PAID)
   createdAt      DateTime      @default(now())
   items          InvoiceItem[]

@@ -8,7 +8,7 @@ import {
 } from '../loyalty/loyalty.service';
 import { validateOffer } from '../offers/offers.service';
 
-type PaymentMethod = 'CASH' | 'CARD' | 'WALLET' | 'ELECTRONIC';
+type PaymentMethod = 'CASH' | 'CARD' | 'WALLET' | 'ELECTRONIC' | 'BANK_TRANSFER';
 
 export interface AppointmentInvoiceInput {
   appointmentId: number;
@@ -20,6 +20,8 @@ export interface AppointmentInvoiceInput {
   redeemPoints?: number;
   giftCardCode?: string;
   branchId?: number;
+  bankReference?: string;
+  bankName?: string;
 }
 
 export interface ManualInvoiceItemInput {
@@ -42,6 +44,8 @@ export interface ManualInvoiceInput {
   redeemPoints?: number;
   giftCardCode?: string;
   branchId?: number;
+  bankReference?: string;
+  bankName?: string;
   items: ManualInvoiceItemInput[];
 }
 
@@ -248,6 +252,8 @@ async function createInvoiceFromAppointment(input: AppointmentInvoiceInput) {
         offerCode: offerAndRedeem.offerCode,
         pointsRedeemed: offerAndRedeem.pointsRedeemed,
         paymentMethod: input.paymentMethod,
+        bankReference: input.bankReference ?? null,
+        bankName: input.bankName ?? null,
         status: 'PAID',
         items: {
           create: [
@@ -459,6 +465,8 @@ async function createInvoiceManual(input: ManualInvoiceInput) {
         offerCode: offerAndRedeem.offerCode,
         pointsRedeemed: offerAndRedeem.pointsRedeemed,
         paymentMethod: input.paymentMethod,
+        bankReference: input.bankReference ?? null,
+        bankName: input.bankName ?? null,
         status: 'PAID',
         items: { create: itemRows },
       },
@@ -656,11 +664,101 @@ async function summary(date: Date): Promise<SummaryResult> {
   };
 }
 
+async function cancelInvoice(id: number, reason?: string) {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    include: { items: true, payments: true },
+  });
+  if (!invoice) {
+    throw new ApiError(404, 'Invoice not found.');
+  }
+  if (invoice.status === 'CANCELLED') {
+    throw new ApiError(400, 'Invoice is already cancelled.');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // 1) Mark invoice as cancelled
+    const updated = await tx.invoice.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+      include: invoiceIncludes,
+    });
+
+    // 2) Reverse client totalSpent
+    await tx.client.update({
+      where: { id: invoice.clientId },
+      data: { totalSpent: { decrement: Number(invoice.total) } },
+    });
+
+    // 3) Refund gift card balance if used
+    if (invoice.giftCardId && Number(invoice.giftCardAmount) > 0) {
+      await tx.giftCard.update({
+        where: { id: invoice.giftCardId },
+        data: { balance: { increment: Number(invoice.giftCardAmount) } },
+      });
+    }
+
+    // 4) Restore redeemed loyalty points
+    if (invoice.pointsRedeemed > 0) {
+      await tx.client.update({
+        where: { id: invoice.clientId },
+        data: { loyaltyPoints: { increment: invoice.pointsRedeemed } },
+      });
+    }
+
+    // 5) Deduct earned points
+    if (invoice.pointsEarned > 0) {
+      const client = await tx.client.findUnique({
+        where: { id: invoice.clientId },
+        select: { loyaltyPoints: true },
+      });
+      if (client) {
+        const newPoints = Math.max(0, client.loyaltyPoints - invoice.pointsEarned);
+        await tx.client.update({
+          where: { id: invoice.clientId },
+          data: { loyaltyPoints: newPoints },
+        });
+      }
+    }
+
+    // 6) Restore product stock for sold products
+    for (const item of invoice.items) {
+      if (item.productId) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { quantity: { increment: item.quantity } },
+        });
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: 'IN',
+            quantity: item.quantity,
+            referenceId: `CANCEL-${invoice.invoiceNo}`,
+          },
+        });
+      }
+    }
+
+    // 7) Refund all associated payments
+    for (const payment of invoice.payments) {
+      if (payment.status !== 'REFUNDED') {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'REFUNDED' },
+        });
+      }
+    }
+
+    return { ...updated, cancelReason: reason ?? null };
+  });
+}
+
 export const accountingService = {
   createInvoiceFromAppointment,
   createInvoiceManual,
   listInvoices,
   getInvoice,
+  cancelInvoice,
   createExpense,
   listExpenses,
   updateExpense,

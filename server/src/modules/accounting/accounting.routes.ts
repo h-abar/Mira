@@ -66,6 +66,7 @@ accountingRouter.use(auth);
 accountingRouter.post('/invoices', invoiceCreate, validateInvoiceCreate, accountingController.createInvoice);
 accountingRouter.get('/invoices', accountRead, validateInvoiceList, accountingController.listInvoices);
 accountingRouter.get('/invoices/:id', accountRead, accountingController.getInvoice);
+accountingRouter.post('/invoices/:id/cancel', accountWrite, accountingController.cancelInvoice);
 
 accountingRouter.post('/expenses', accountWrite, validateExpenseCreate, accountingController.createExpense);
 accountingRouter.get('/expenses', accountRead, validateExpenseList, accountingController.listExpenses);

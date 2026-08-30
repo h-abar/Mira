@@ -1,7 +1,7 @@
 import { api } from './client';
 import type { Employee } from './employees';
 
-export type PaymentMethod = 'CASH' | 'CARD' | 'WALLET' | 'ELECTRONIC';
+export type PaymentMethod = 'CASH' | 'CARD' | 'WALLET' | 'ELECTRONIC' | 'BANK_TRANSFER';
 export type InvoiceStatus = 'PAID' | 'PENDING' | 'CANCELLED';
 
 export interface InvoiceItem {
@@ -34,6 +34,8 @@ export interface Invoice {
   pointsEarned?: number;
   pointsRedeemed?: number;
   paymentMethod: PaymentMethod;
+  bankReference?: string | null;
+  bankName?: string | null;
   status: InvoiceStatus;
   client?: { id: number; name: string; phone?: string | null } | null;
   employee?: Employee | null;
@@ -79,6 +81,8 @@ export interface ManualInvoiceInput {
   offerCode?: string;
   redeemPoints?: number;
   giftCardCode?: string;
+  bankReference?: string;
+  bankName?: string;
   items: InvoiceItemInput[];
 }
 
@@ -91,6 +95,8 @@ export interface AppointmentInvoiceInput {
   offerCode?: string;
   redeemPoints?: number;
   giftCardCode?: string;
+  bankReference?: string;
+  bankName?: string;
 }
 
 export interface ExpenseInput {
@@ -129,6 +135,9 @@ export const createInvoiceFromAppointment = (data: AppointmentInvoiceInput) =>
 
 export const createInvoiceManual = (data: ManualInvoiceInput) =>
   api.post<{ success: boolean; data: Invoice }>('/accounting/invoices', data).then(unwrap);
+
+export const cancelInvoice = (id: number, reason?: string) =>
+  api.post<{ success: boolean; data: Invoice }>(`/accounting/invoices/${id}/cancel`, { reason }).then(unwrap);
 
 export const listExpenses = (params?: { from?: string; to?: string; category?: string }) =>
   api.get<{ success: boolean; data: Expense[] }>('/accounting/expenses', { params }).then(unwrap);

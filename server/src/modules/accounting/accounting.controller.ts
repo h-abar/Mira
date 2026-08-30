@@ -28,6 +28,8 @@ async function createInvoice(req: Request, res: Response, next: NextFunction): P
         offerCode: body.offerCode,
         redeemPoints: body.redeemPoints,
         branchId: body.branchId,
+        bankReference: body.bankReference,
+        bankName: body.bankName,
       };
       data = await accountingService.createInvoiceFromAppointment(input);
     } else {
@@ -139,10 +141,22 @@ async function summary(req: Request, res: Response, next: NextFunction): Promise
   }
 }
 
+async function cancelInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseId(req.params.id);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : undefined;
+    const data = await accountingService.cancelInvoice(id, reason);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const accountingController = {
   createInvoice,
   listInvoices,
   getInvoice,
+  cancelInvoice,
   createExpense,
   listExpenses,
   updateExpense,

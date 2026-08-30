@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -23,6 +25,8 @@ import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import CircularProgress from '@mui/material/CircularProgress';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -284,6 +288,7 @@ interface AppointmentDialogProps {
   lang: Lang;
   L: Labels;
   pointValue: number;
+  isMobile: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
   onItemSaved?: (message: string) => void;
@@ -300,6 +305,7 @@ function AppointmentDialog({
   lang,
   L,
   pointValue,
+  isMobile,
   onClose,
   onSaved,
 }: AppointmentDialogProps) {
@@ -477,11 +483,11 @@ function AppointmentDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" fullScreen={isMobile}>
       <DialogTitle sx={{ fontWeight: 700 }}>
         {mode === 'create' ? L.newAppointment : L.edit}
       </DialogTitle>
-      <DialogContent dividers sx={{ maxHeight: '72vh', overflowY: 'auto' }}>
+      <DialogContent dividers sx={{ maxHeight: isMobile ? 'none' : '72vh', overflowY: 'auto' }}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
 
@@ -824,6 +830,8 @@ function AppointmentDialog({
 
 export default function AppointmentsPage() {
   const { i18n, t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const lang: Lang = i18n.language === 'en' ? 'en' : 'ar';
   const L = labels[lang];
@@ -1719,6 +1727,114 @@ export default function AppointmentsPage() {
       )}
 
       {viewMode === 'table' && (
+        isMobile ? (
+          <Stack spacing={1.5}>
+            {loading ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : appointments.length === 0 ? (
+              <Paper sx={{ p: 4, textAlign: 'center' }}>
+                <Typography color="text.secondary">{L.noAppointments}</Typography>
+              </Paper>
+            ) : (
+              appointments.filter(matchesClientSearch).map((appointment) => (
+                <Card key={appointment.id} variant="outlined" sx={{ borderRadius: '14px' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {appointment.startTime} – {appointment.endTime}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        {(appointment.payments ?? []).length > 0 && (
+                          <Tooltip
+                            title={`${L.confirmedPaid} (${appointment.payments!.map((p) => Number(p.amount).toFixed(2)).join(', ')})`}
+                          >
+                            <Chip label="✓" size="small" color="success" sx={{ fontWeight: 700 }} />
+                          </Tooltip>
+                        )}
+                        <Chip
+                          label={L.statuses[appointment.status]}
+                          color={statusColor[appointment.status]}
+                          size="small"
+                        />
+                      </Stack>
+                    </Stack>
+                    <Typography variant="body2" fontWeight={600}>
+                      {appointment.client?.name ?? `#${appointment.clientId}`}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {nameOf(appointment.service)} · {nameOf(appointment.employee)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {Number(appointment.service?.price ?? 0).toFixed(2)} {L.price}
+                    </Typography>
+                    {appointment.notes && (
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                        {appointment.notes.includes('[حجز أونلاين]')
+                          ? <Chip label="حجز أونلاين" size="small" color="secondary" variant="outlined" sx={{ fontWeight: 700, mr: 0.5 }} />
+                          : appointment.notes}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
+                      {appointment.client?.phone && (
+                        <IconButton size="small" onClick={() => void handleRemind(appointment)}>
+                          <WhatsAppIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManage && appointment.status === 'BOOKED' && (
+                        <IconButton size="small" color="success" onClick={() => openPayDialog(appointment)}>
+                          <PaidIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManage && (
+                        <IconButton size="small" onClick={() => openInvoiceDialog(appointment)}>
+                          <PrintIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManage && (
+                        <FormControl size="small" sx={{ minWidth: 100, flex: '1 1 100px' }}>
+                          <Select<AppointmentStatus>
+                            value={appointment.status}
+                            size="small"
+                            onChange={(e) =>
+                              void handleStatusChange(appointment, e.target.value as AppointmentStatus)
+                            }
+                          >
+                            {ALL_STATUSES.map((status) => (
+                              <MenuItem key={status} value={status}>
+                                {L.statuses[status]}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                      {canManage && (
+                        <IconButton
+                          size="small"
+                          title={L.edit}
+                          onClick={() => setDialog({ open: true, mode: 'edit', appointment })}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManage && (
+                        <IconButton
+                          size="small"
+                          title={L.delete}
+                          color="error"
+                          onClick={() => setDeleteTarget(appointment)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </Stack>
+        ) : (
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
@@ -1869,6 +1985,7 @@ export default function AppointmentsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+        )
       )}
 
       {/* Appointment invoice dialog with loyalty redemption */}
@@ -2031,6 +2148,7 @@ export default function AppointmentsPage() {
         lang={lang}
         L={L}
         pointValue={pointValue}
+        isMobile={isMobile}
         onClose={() => setDialog((d) => ({ ...d, open: false }))}
         onSaved={handleDialogSaved}
         onItemSaved={(msg) => {
