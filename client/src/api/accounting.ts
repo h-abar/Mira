@@ -72,6 +72,7 @@ export interface InvoiceItemInput {
   description?: string;
   quantity: number;
   unitPrice?: number;
+  employeeId?: number;
 }
 
 export interface ManualInvoiceInput {
@@ -86,6 +87,7 @@ export interface ManualInvoiceInput {
   giftCardCode?: string;
   bankReference?: string;
   bankName?: string;
+  branchId?: number;
   items: InvoiceItemInput[];
 }
 
@@ -100,6 +102,7 @@ export interface AppointmentInvoiceInput {
   giftCardCode?: string;
   bankReference?: string;
   bankName?: string;
+  branchId?: number;
 }
 
 export interface ExpenseInput {

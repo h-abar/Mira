@@ -134,10 +134,22 @@ export const createAppTheme = (lang: string): Theme => {
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 10 },
+          root: { borderRadius: 10, minHeight: 40 },
           contained: {
             boxShadow: 'none',
             '&:hover': { boxShadow: '0 6px 14px rgba(194,24,91,0.25)' },
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            // Ensure minimum touch target on mobile
+            '@media (max-width:600px)': {
+              minWidth: 44,
+              minHeight: 44,
+              padding: 10,
+            },
           },
         },
       },

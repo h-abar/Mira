@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { env } from '../../config/env';
 import { ApiError } from '../../utils/ApiError';
 import {
@@ -6,6 +7,10 @@ import {
   getTenantList,
   setTenantStatus as updateTenantStatus,
 } from './tenants.service';
+
+// Hash the platform admin password once at startup so we compare hashes,
+// not plaintext. This protects against timing attacks and memory dumps.
+const PLATFORM_ADMIN_PASSWORD_HASH = bcrypt.hashSync(env.PLATFORM_ADMIN_PASSWORD, 10);
 
 function requirePlatformAdmin(req: Request, _res: Response, next: NextFunction): void {
   const username = req.headers['x-platform-username'];
@@ -15,7 +20,7 @@ function requirePlatformAdmin(req: Request, _res: Response, next: NextFunction):
     typeof username !== 'string' ||
     typeof password !== 'string' ||
     username !== env.PLATFORM_ADMIN_USERNAME ||
-    password !== env.PLATFORM_ADMIN_PASSWORD
+    !bcrypt.compareSync(password, PLATFORM_ADMIN_PASSWORD_HASH)
   ) {
     next(new ApiError(401, 'Platform admin authentication required.'));
     return;

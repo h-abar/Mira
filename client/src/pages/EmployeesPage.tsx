@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMediaQuery, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -246,6 +247,8 @@ export default function EmployeesPage() {
   const lang = i18n.language === 'en' ? 'en' : 'ar';
   const L = lang === 'ar' ? arLabels : enLabels;
   const roleLabels = lang === 'ar' ? roleLabelsAr : roleLabelsEn;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const isAdmin = useAuthStore((s) => s.hasPermission('employees.write'));
   const canViewCost = useAuthStore((s) => s.hasPermission('cost.view'));
@@ -612,7 +615,7 @@ export default function EmployeesPage() {
         />
       </Box>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>
           {editing ? `${L.edit} — ${L.title}` : L.add}
         </DialogTitle>
@@ -825,7 +828,7 @@ export default function EmployeesPage() {
       </Dialog>
 
       {/* User account management dialog */}
-      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{linkedUser ? L.editUserAccount : L.createUserAccount}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>

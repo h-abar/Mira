@@ -183,6 +183,15 @@ export type SettingKey = keyof typeof SETTINGS_DEFINITIONS;
 
 const KNOWN_KEYS = Object.keys(SETTINGS_DEFINITIONS) as SettingKey[];
 
+// Keys that contain secrets — their values are masked in normal GET responses
+const SECRET_KEYS = new Set([
+  'WHATSAPP_TOKEN',
+  'PAYMENT_API_KEY',
+  'PAYMENT_PUBLIC_KEY',
+  'ZATCA_PRIVATE_KEY',
+  'ZATCA_CERTIFICATE',
+]);
+
 async function getAll() {
   const rows = await prisma.setting.findMany({
     where: { key: { in: KNOWN_KEYS } },
@@ -192,9 +201,15 @@ async function getAll() {
 
   const items = KNOWN_KEYS.map((key) => {
     const def = SETTINGS_DEFINITIONS[key];
+    const rawValue = stored.get(key) ?? def.defaultValue;
+    // Mask secrets: show whether set, but never the actual value
+    const value = SECRET_KEYS.has(key) && rawValue
+      ? '••••••••'
+      : rawValue;
     return {
       key,
-      value: stored.get(key) ?? def.defaultValue,
+      value,
+      isSecret: SECRET_KEYS.has(key),
       labelAr: def.labelAr,
       labelEn: def.labelEn,
     };

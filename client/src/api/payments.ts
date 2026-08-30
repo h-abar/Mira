@@ -14,6 +14,8 @@ export interface PaymentItem {
 export interface PaymentListQuery {
   page?: number;
   limit?: number;
+  status?: string;
+  invoiceId?: number;
 }
 
 export interface PaymentListResult {

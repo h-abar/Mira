@@ -141,9 +141,12 @@ export async function createTenant(input: CreateTenantInput): Promise<{ slug: st
   // 2) Apply the full schema
   await runPrisma('db push', dbName);
 
-  // 3) Seed admin user + defaults
+  // 3) Seed admin user + defaults — require a strong password
   const adminUsername = (input.adminUsername ?? 'admin').trim().toLowerCase();
-  const adminPassword = input.adminPassword ?? 'admin1234';
+  const adminPassword = input.adminPassword;
+  if (!adminPassword || adminPassword.length < 8) {
+    throw new ApiError(400, 'A strong admin password (min 8 characters) is required when creating a workspace.');
+  }
   await seedTenantData(dbName, adminUsername, adminPassword);
 
   // 4) Register in the master registry

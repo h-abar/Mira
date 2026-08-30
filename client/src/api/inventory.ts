@@ -46,6 +46,7 @@ export interface ProductPayload {
   salePrice?: number;
   minStock?: number;
   supplier?: string;
+  supplierId?: number;
   branchId?: number | null;
   isActive?: boolean;
 }
@@ -62,8 +63,10 @@ interface ApiResponse<T> {
   data: T;
 }
 
+const unwrap = <T>(response: ApiResponse<T>): T => response.data;
+
 export const listProducts = (params: ListProductsParams = {}) =>
-  api.get<ApiResponse<Product[]>>('/inventory/products', { params });
+  api.get<ApiResponse<Product[]>>('/inventory/products', { params }).then(unwrap);
 
 export const createProduct = (data: ProductPayload) =>
   api.post<ApiResponse<Product>>('/inventory/products', data);

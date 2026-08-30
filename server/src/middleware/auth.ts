@@ -25,9 +25,13 @@ export function auth(req: Request, _res: Response, next: NextFunction): void {
     const token = header.slice(7);
     const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 
-    // Tenant isolation: a token issued for one workspace must never
-    // be accepted against another workspace's database.
-    if (decoded.tenant && decoded.tenant !== (getTenantSlug() ?? env.DEFAULT_TENANT)) {
+    // Tenant isolation: tokens must contain a tenant claim that matches the
+    // current workspace. Reject tokens missing the claim entirely.
+    const currentTenant = getTenantSlug() ?? env.DEFAULT_TENANT;
+    if (!decoded.tenant) {
+      return next(new ApiError(403, 'Token is missing tenant claim. Please log in again.'));
+    }
+    if (decoded.tenant !== currentTenant) {
       return next(new ApiError(403, 'Token does not belong to this workspace.'));
     }
 

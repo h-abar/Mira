@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMediaQuery, useTheme } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -276,6 +277,8 @@ export default function POSPage() {
   const lang = i18n.language === 'en' ? 'en' : 'ar';
   const l = L[lang];
   const selectedBranchId = useBranchStore((s) => s.selectedBranchId);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
@@ -381,7 +384,7 @@ export default function POSPage() {
         ]);
         if (!active) return;
         setServices(servs);
-        setProducts(prods.data);
+        setProducts(prods);
         setClients(clis.items);
         setEmployees(emps.filter((e) => e.isActive));
       } catch (err) {
@@ -633,7 +636,7 @@ export default function POSPage() {
       setSearch('');
       try {
         const refreshed = await listProducts({ branchId: selectedBranchId ?? undefined });
-        setProducts(refreshed.data);
+        setProducts(refreshed);
       } catch {
         // ignore refresh failure
       }
@@ -1439,6 +1442,7 @@ export default function POSPage() {
         onClose={() => setSuccessInvoice(null)}
         maxWidth="xs"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>{l.invoiceCreated}</DialogTitle>
         <DialogContent>
@@ -1604,7 +1608,7 @@ export default function POSPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={newClientOpen} onClose={() => setNewClientOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={newClientOpen} onClose={() => setNewClientOpen(false)} maxWidth="xs" fullWidth fullScreen={isMobile}>
         <DialogTitle>{l.newClient}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>

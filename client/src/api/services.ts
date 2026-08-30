@@ -5,9 +5,9 @@ export interface Service {
   nameAr: string;
   nameEn: string;
   category: string;
-  price: string;
+  price: string | number;
   durationMinutes: number;
-  cost: string;
+  cost: string | number;
   isActive: boolean;
 }
 

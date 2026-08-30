@@ -252,7 +252,7 @@ export default function InventoryPage() {
         lowStock: lowStockOnly || undefined,
         branchId: selectedBranchId ?? undefined,
       });
-      setProducts(res.data);
+      setProducts(res);
     } catch (err) {
       setError((err as { message?: string }).message ?? l.error);
     } finally {

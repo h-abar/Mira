@@ -61,11 +61,25 @@ async function exportJson() {
     prisma.purchaseOrder.findMany(),
     prisma.purchaseOrderItem.findMany(),
     prisma.service.findMany(),
-    prisma.setting.findMany(),
+    prisma.setting.findMany().then((allSettings) =>
+      // Exclude sensitive integration keys/secrets from backups
+      allSettings.filter((s) => !['ZATCA_PRIVATE_KEY', 'ZATCA_CERTIFICATE', 'WHATSAPP_TOKEN', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY'].includes(s.key)),
+    ),
     prisma.shiftSession.findMany(),
     prisma.stockMovement.findMany(),
     prisma.supplier.findMany(),
-    prisma.user.findMany(),
+    prisma.user.findMany({
+      // Never expose passwordHash in backups
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        permissions: true,
+        employeeId: true,
+        isActive: true,
+        createdAt: true,
+      },
+    }),
     prisma.membershipPlan.findMany(),
     prisma.clientMembership.findMany(),
     prisma.giftCard.findMany(),

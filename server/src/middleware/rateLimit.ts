@@ -8,13 +8,18 @@ interface Attempt {
 
 const WINDOW_MS = 60_000; // 1 minute
 const MAX_ATTEMPTS = 10;
+const API_MAX_REQUESTS = 300; // 300 requests per minute per IP for general API
 
 const globalForLimiter = globalThis as unknown as {
   loginAttempts?: Map<string, Attempt>;
+  apiAttempts?: Map<string, Attempt>;
 };
 
 const attempts = globalForLimiter.loginAttempts ?? new Map<string, Attempt>();
 globalForLimiter.loginAttempts = attempts;
+
+const apiAttempts = globalForLimiter.apiAttempts ?? new Map<string, Attempt>();
+globalForLimiter.apiAttempts = apiAttempts;
 
 function clientKey(req: Request): string {
   const username = typeof req.body?.username === 'string' ? req.body.username.toLowerCase() : '';
@@ -22,27 +27,40 @@ function clientKey(req: Request): string {
   return `${ip}|${username}`;
 }
 
-export function loginRateLimit(req: Request, _res: Response, next: NextFunction): void {
-  const now = Date.now();
-  const key = clientKey(req);
+function ipKey(req: Request): string {
+  return req.ip ?? req.socket.remoteAddress ?? 'unknown';
+}
 
-  // Periodic sweep so the map does not grow unbounded.
-  if (attempts.size > 10_000) {
-    for (const [k, v] of attempts) {
-      if (now - v.firstAt > WINDOW_MS) attempts.delete(k);
+function checkRateLimit(
+  map: Map<string, Attempt>,
+  key: string,
+  max: number,
+  next: NextFunction,
+  message: string,
+): void {
+  const now = Date.now();
+  if (map.size > 10_000) {
+    for (const [k, v] of map) {
+      if (now - v.firstAt > WINDOW_MS) map.delete(k);
     }
   }
-
-  const entry = attempts.get(key);
+  const entry = map.get(key);
   if (!entry || now - entry.firstAt > WINDOW_MS) {
-    attempts.set(key, { count: 1, firstAt: now });
+    map.set(key, { count: 1, firstAt: now });
     return next();
   }
-
   entry.count += 1;
-  if (entry.count > MAX_ATTEMPTS) {
-    next(new ApiError(429, 'Too many login attempts. Please wait a minute and try again.'));
+  if (entry.count > max) {
+    next(new ApiError(429, message));
     return;
   }
   next();
+}
+
+export function loginRateLimit(req: Request, _res: Response, next: NextFunction): void {
+  checkRateLimit(attempts, clientKey(req), MAX_ATTEMPTS, next, 'Too many login attempts. Please wait a minute and try again.');
+}
+
+export function apiRateLimit(req: Request, _res: Response, next: NextFunction): void {
+  checkRateLimit(apiAttempts, ipKey(req), API_MAX_REQUESTS, next, 'Too many requests. Please slow down.');
 }

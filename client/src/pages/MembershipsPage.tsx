@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMediaQuery, useTheme } from '@mui/material';
 import {
   DataGrid,
   type GridColDef,
@@ -167,6 +168,8 @@ export default function MembershipsPage() {
   const lang = i18n.language === 'en' ? 'en' : 'ar';
   const l = L[lang];
   const canWrite = useAuthStore((s) => s.hasPermission('memberships'));
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [tab, setTab] = useState(0);
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
@@ -490,7 +493,7 @@ export default function MembershipsPage() {
         </Box>
       )}
 
-      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, editing: null })} fullWidth maxWidth="sm">
+      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, editing: null })} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{planDialog.editing ? l.editPlan : l.addPlan}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -572,7 +575,7 @@ export default function MembershipsPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} fullWidth maxWidth="sm">
+      <Dialog open={assignDialog} onClose={() => setAssignDialog(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{l.assignTitle}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>

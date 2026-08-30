@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
 import { env } from './config/env';
 import { ensureMasterSchema } from './config/master';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { i18n } from './middleware/i18n';
+import { apiRateLimit } from './middleware/rateLimit';
 import { tenantResolver } from './middleware/tenant';
 import accountingRouter from './modules/accounting/accounting.routes';
 import appointmentsRouter from './modules/appointments/appointments.routes';
@@ -34,10 +36,22 @@ import publicRouter from './modules/public/public.routes';
 
 const app = express();
 
-const corsOrigin = env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',');
+// Security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, etc.)
+app.use(helmet({
+  contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+  crossOriginEmbedderPolicy: false,
+}));
 
-app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use(express.json());
+// CORS: explicit allow-list in production; localhost in development
+const corsOrigin = env.CORS_ORIGIN === '*'
+  ? true
+  : env.CORS_ORIGIN.split(',').map((o) => o.trim());
+
+app.use(cors({
+  origin: corsOrigin,
+  credentials: true,
+}));
+app.use(express.json({ limit: '1mb' }));
 app.use(i18n);
 
 // Multi-tenant resolution must wrap all API routes so every query
@@ -49,10 +63,10 @@ app.get('/api/health', (_req, res) => {
     success: true,
     message: 'Server is running',
     timestamp: new Date().toISOString(),
-    version: '1.1.0',
   });
 });
 
+app.use('/api', apiRateLimit);
 app.use('/api', tenantResolver);
 
 const apiRouter = express.Router();

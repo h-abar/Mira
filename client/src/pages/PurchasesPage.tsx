@@ -203,7 +203,7 @@ export default function PurchasesPage() {
         listProducts({}),
       ]);
       setSuppliers(suppliersRes.data.items);
-      setProducts(productsRes.data);
+      setProducts(productsRes);
     } catch {
       // ignore
     }
