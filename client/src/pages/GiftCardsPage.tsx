@@ -267,14 +267,14 @@ export default function GiftCardsPage() {
       width: 130,
       renderCell: (params) =>
         params.value
-          ? new Date(params.value as string).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')
+          ? new Date(params.value as string).toLocaleDateString('en-GB')
           : l.noExpiry,
     },
     {
       field: 'createdAt',
       headerName: l.colCreated,
       width: 140,
-      renderCell: (params) => new Date(params.value as string).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US'),
+      renderCell: (params) => new Date(params.value as string).toLocaleDateString('en-GB'),
     },
     {
       field: 'actions',

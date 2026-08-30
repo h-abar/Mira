@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
-import { exportDataset, type ExportLang } from '../../utils/exportHelper';
+import { exportDataset, fmtDate, type ExportLang } from '../../utils/exportHelper';
 import {
   accountingService,
   type AppointmentInvoiceInput,
@@ -75,6 +75,17 @@ async function getInvoice(req: Request, res: Response, next: NextFunction): Prom
   }
 }
 
+async function cancelInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseId(req.params.id);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : undefined;
+    const data = await accountingService.cancelInvoice(id, reason);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function createExpense(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (!req.user) {
@@ -92,7 +103,7 @@ async function createExpense(req: Request, res: Response, next: NextFunction): P
 
 async function listExpenses(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const query = req.query as unknown as { from?: Date; to?: Date; category?: string };
+    const query = req.query as unknown as { from?: Date; to?: Date; category?: string; branchId?: number };
     const data = await accountingService.listExpenses({
       from: query.from,
       to: query.to,
@@ -142,17 +153,6 @@ async function summary(req: Request, res: Response, next: NextFunction): Promise
   }
 }
 
-async function cancelInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const id = parseId(req.params.id);
-    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : undefined;
-    const data = await accountingService.cancelInvoice(id, reason);
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-}
-
 async function exportInvoices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const query = req.query as unknown as {
@@ -180,18 +180,18 @@ async function exportInvoices(req: Request, res: Response, next: NextFunction): 
         : `Total: ${data.total} invoices`,
       lang,
       columns: isAr
-        ? ['#', 'التاريخ', 'العميل', 'الإجمالي', 'الخصم', 'الضريبة', 'النهاية', 'طريقة الدفع', 'الحالة']
-        : ['#', 'Date', 'Client', 'Total', 'Discount', 'Tax', 'Final', 'Payment', 'Status'],
+        ? ['#', 'التاريخ', 'العميل', 'الإجمالي (ر.س)', 'الخصم (ر.س)', 'الضريبة (ر.س)', 'الصافي (ر.س)', 'طريقة الدفع', 'الحالة']
+        : ['#', 'Date', 'Client', 'Total (SAR)', 'Discount (SAR)', 'Tax (SAR)', 'Final (SAR)', 'Payment', 'Status'],
       rows: data.items.map((inv: any) => [
         inv.id,
-        new Date(inv.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
-        inv.client?.name ?? '-',
+        fmtDate(inv.date),
+        inv.client?.name ?? '—',
         Number(inv.totalAmount ?? 0),
         Number(inv.discount ?? 0),
         Number(inv.tax ?? 0),
         Number(inv.finalAmount ?? 0),
-        inv.paymentMethod ?? '-',
-        inv.status ?? '-',
+        inv.paymentMethod ?? '—',
+        inv.status ?? '—',
       ]),
     };
     const result = await exportDataset(dataset, format);
@@ -225,15 +225,15 @@ async function exportExpenses(req: Request, res: Response, next: NextFunction): 
       subtitle: isAr ? `إجمالي: ${items.length} مصروف` : `Total: ${items.length} expenses`,
       lang,
       columns: isAr
-        ? ['#', 'التاريخ', 'الفئة', 'المبلغ', 'الوصف', 'بواسطة']
-        : ['#', 'Date', 'Category', 'Amount', 'Description', 'By'],
+        ? ['#', 'التاريخ', 'الفئة', 'المبلغ (ر.س)', 'الوصف', 'بواسطة']
+        : ['#', 'Date', 'Category', 'Amount (SAR)', 'Description', 'By'],
       rows: items.map((exp: any) => [
         exp.id,
-        new Date(exp.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
-        exp.category ?? '-',
+        fmtDate(exp.date),
+        exp.category ?? '—',
         Number(exp.amount ?? 0),
-        exp.description ?? '-',
-        exp.creator?.username ?? '-',
+        exp.description ?? '—',
+        exp.creator?.username ?? '—',
       ]),
     };
     const result = await exportDataset(dataset, format);

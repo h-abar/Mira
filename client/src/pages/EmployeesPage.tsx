@@ -316,7 +316,7 @@ export default function EmployeesPage() {
   const formatDate = (value: string): string => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-GB');
+    return date.toLocaleDateString('en-GB');
   };
 
   const openAdd = () => {

@@ -26,6 +26,13 @@ import BackupIcon from '@mui/icons-material/Backup';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import LinkIcon from '@mui/icons-material/Link';
+import LockIcon from '@mui/icons-material/Lock';
+import InputAdornment from '@mui/material/InputAdornment';
 import { useSettings, useUpdateSettings } from '../api/settingsHooks';
 import {
   downloadJsonBackup,
@@ -42,8 +49,9 @@ import { useAuthStore } from '../stores/authStore';
 import PageHeader from '../components/PageHeader';
 
 const LOYALTY_KEYS = ['LOYALTY_POINTS_PER_CURRENCY', 'LOYALTY_POINT_VALUE'] as const;
-const PAYMENT_KEYS = ['PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY'] as const;
-const WHATSAPP_SAVE_KEYS = ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID', 'WHATSAPP_ENABLED'] as const;
+const PAYMENT_KEYS = ['PAYMENT_GATEWAY', 'PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY', 'PAYMENT_MERCHANT_ID', 'PAYMENT_WEBHOOK_URL', 'PAYMENT_CURRENCY'] as const;
+const WHATSAPP_SAVE_KEYS = ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID', 'WHATSAPP_ENABLED', 'WHATSAPP_BUSINESS_ACCOUNT_ID', 'WHATSAPP_WEBHOOK_SECRET', 'WHATSAPP_PUBLIC_PHONE'] as const;
+const SOCIAL_KEYS = ['SOCIAL_INSTAGRAM', 'SOCIAL_FACEBOOK', 'SOCIAL_WHATSAPP', 'SOCIAL_SNAPCHAT', 'SOCIAL_TIKTOK'] as const;
 
 const ZATCA_KEYS = [
   'ZATCA_VAT_NUMBER',
@@ -103,6 +111,9 @@ const L = {
     save: 'حفظ', saving: 'جارٍ الحفظ...', saved: 'تم حفظ الإعدادات بنجاح',
     saveFailed: 'فشل حفظ الإعدادات', loadFailed: 'تعذر تحميل الإعدادات',
     settingsNote: 'تُستخدم هذه الإعدادات في الفوترة ونقاط الولاء وعرض اسم الصالون.',
+    socialTitle: 'حسابات وسائل التواصل الاجتماعي',
+    socialNote: 'تُعرض هذه الروابط في صفحة الواجهة وبطاقة العميلة والفواتير المطبوعة.',
+    saveSocialBtn: 'حفظ وسائل التواصل',
     hoursNote: 'حدد أيام وساعات العمل للصالون. الأيام المفعلة كـ (يوم عمل) تتاح لحجز المواعيد، والأيام غير المفعلة تعتبر إجازة أسبوعية مغلقة.',
     hoursOpen: 'وقت الفتح', hoursClose: 'وقت الإغلاق', hoursWorkDay: 'يوم عمل مفعّل', hoursDayOff: 'إجازة أسبوعية',
     hoursCopy: 'نسخ ساعات هذا اليوم لجميع الأيام المفتوحة',
@@ -156,6 +167,9 @@ const L = {
     save: 'Save', saving: 'Saving...', saved: 'Settings saved successfully',
     saveFailed: 'Failed to save settings', loadFailed: 'Failed to load settings',
     settingsNote: 'These settings are used for invoicing, loyalty points and the salon name.',
+    socialTitle: 'Social Media Accounts',
+    socialNote: 'These links appear on the client portal, receipts, and printed invoices.',
+    saveSocialBtn: 'Save Social Media',
     hoursNote: 'Set salon working hours and active workdays. Active days allow bookings; inactive days are marked as weekly days off.',
     hoursOpen: 'Opening', hoursClose: 'Closing', hoursWorkDay: 'Work Day (Active)', hoursDayOff: 'Day Off',
     hoursCopy: 'Copy hours to all open days',
@@ -195,10 +209,13 @@ const L = {
     zatcaTestSuccess: 'Test passed: QR and signature generated',
     qrModeTitle: 'QR Display Mode', qrModeSquare: 'Square QR (image)', qrModeText: 'Legacy text (Base64)',
     paymentsTitle: 'Electronic Payments',
-    paymentsNote: 'Payment settings are used at checkout. Keep your keys secret.',
-    paymentMethod: 'Payment Method', paymentApiKey: 'API Key', paymentPublicKey: 'Public Key',
-    whatsappTitle: 'WhatsApp', whatsappToken: 'Access Token',
-    whatsappPhoneId: 'Phone ID', whatsappEnabled: 'Enable WhatsApp',
+    paymentsNote: 'Configure your Saudi payment gateway. Keep your secret keys confidential.',
+    paymentGateway: 'Payment Gateway', paymentMethod: 'Default Payment Method', paymentApiKey: 'Secret API Key', paymentPublicKey: 'Publishable Key',
+    paymentMerchantId: 'Merchant ID', paymentWebhook: 'Webhook URL', paymentCurrency: 'Currency',
+    paymentApiNote: 'Find these keys in your payment gateway dashboard.',
+    whatsappTitle: 'WhatsApp Business', whatsappToken: 'Access Token',
+    whatsappPhoneId: 'Phone Number ID', whatsappEnabled: 'Enable WhatsApp',
+    whatsappBizAccount: 'Business Account ID', whatsappWebhookSecret: 'Webhook Secret', whatsappPublicPhone: 'Public WhatsApp Number',
     whatsappTest: 'Test', whatsappTestPhone: 'Test phone number',
     whatsappTestRunning: 'Sending...', whatsappTestSimulated: 'Sent successfully (simulated)',
     whatsappTestReal: 'Test message sent successfully', whatsappTestFailed: 'Failed to send test message',
@@ -846,7 +863,137 @@ export default function SettingsPage() {
                 )}
               </Box>
 
-              <Grid container spacing={3} sx={{ mt: 1, maxWidth: 920 }} alignItems="stretch">
+              {/* Social Media Box */}
+              <Box
+                sx={{
+                  border: 1.5,
+                  borderColor: 'info.main',
+                  borderRadius: 2,
+                  p: 2,
+                  maxWidth: 620,
+                  mb: 3,
+                  background: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? 'linear-gradient(135deg, rgba(2,136,209,0.08) 0%, rgba(0,0,0,0) 100%)'
+                      : 'linear-gradient(135deg, rgba(2,136,209,0.05) 0%, rgba(255,255,255,0) 100%)',
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={800} color="info.main" sx={{ mb: 0.5 }}>
+                  {l.socialTitle}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  {l.socialNote}
+                </Typography>
+                <Stack spacing={1.5}>
+                  <TextField
+                    size="small"
+                    label={lang === 'ar' ? 'إنستجرام' : 'Instagram'}
+                    value={values['SOCIAL_INSTAGRAM'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, SOCIAL_INSTAGRAM: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="https://instagram.com/yoursalon"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <InstagramIcon sx={{ color: '#E1306C', fontSize: 20 }} />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    size="small"
+                    label={lang === 'ar' ? 'فيسبوك' : 'Facebook'}
+                    value={values['SOCIAL_FACEBOOK'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, SOCIAL_FACEBOOK: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="https://facebook.com/yoursalon"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <FacebookIcon sx={{ color: '#1877F2', fontSize: 20 }} />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <TextField
+                    size="small"
+                    label={lang === 'ar' ? 'واتساب (رقم التواصل)' : 'WhatsApp (contact number)'}
+                    value={values['SOCIAL_WHATSAPP'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, SOCIAL_WHATSAPP: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="966501234567"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <WhatsAppIcon sx={{ color: '#25D366', fontSize: 20 }} />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <TextField
+                      size="small"
+                      label={lang === 'ar' ? 'سناب شات' : 'Snapchat'}
+                      value={values['SOCIAL_SNAPCHAT'] ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, SOCIAL_SNAPCHAT: e.target.value }))}
+                      disabled={!isAdmin}
+                      fullWidth
+                      placeholder="https://snapchat.com/add/yoursalon"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LinkIcon sx={{ color: '#FFFC00', fontSize: 18, stroke: '#888', strokeWidth: 0.5 }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <TextField
+                      size="small"
+                      label={lang === 'ar' ? 'تيك توك' : 'TikTok'}
+                      value={values['SOCIAL_TIKTOK'] ?? ''}
+                      onChange={(e) => setValues((prev) => ({ ...prev, SOCIAL_TIKTOK: e.target.value }))}
+                      disabled={!isAdmin}
+                      fullWidth
+                      placeholder="https://tiktok.com/@yoursalon"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LinkIcon sx={{ color: '#010101', fontSize: 18 }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                  </Stack>
+                </Stack>
+                {isAdmin && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="info"
+                    startIcon={savingSection === 'social' ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                    onClick={() => void saveKeys(SOCIAL_KEYS, 'social')}
+                    disabled={savingSection !== null}
+                    sx={{ mt: 2, alignSelf: 'flex-start' }}
+                  >
+                    {savingSection === 'social' ? l.saving : l.saveSocialBtn}
+                  </Button>
+                )}
+              </Box>
+
+              <Grid container spacing={3} sx={{ mt: 0, maxWidth: 920 }} alignItems="stretch">
                 <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
                   {renderCatManager('services')}
                 </Grid>
@@ -1071,67 +1218,245 @@ export default function SettingsPage() {
           )}
 
           {tab === 4 && (
-            <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Box sx={{ maxWidth: 700 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
                 {l.paymentsNote}
               </Typography>
-              {renderSettingFields(PAYMENT_KEYS)}
+
+              {/* Gateway selector */}
+              <Box sx={{ border: 1.5, borderColor: 'success.main', borderRadius: 2, p: 2, mb: 2.5 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                  <CreditCardIcon color="success" fontSize="small" />
+                  <Typography variant="subtitle2" fontWeight={800} color="success.main">
+                    {lang === 'ar' ? 'بوابة الدفع' : 'Payment Gateway'}
+                  </Typography>
+                </Stack>
+                <TextField
+                  select
+                  label={l.paymentGateway}
+                  value={values['PAYMENT_GATEWAY'] ?? 'moyasar'}
+                  onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_GATEWAY: e.target.value }))}
+                  disabled={!isAdmin}
+                  fullWidth
+                  sx={{ mb: 1.5 }}
+                >
+                  {PAYMENT_GATEWAY_OPTIONS.map((o) => (
+                    <MenuItem key={o.value} value={o.value}>
+                      {lang === 'ar' ? o.labelAr : o.labelEn}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <TextField
+                    size="small"
+                    label={l.paymentMerchantId}
+                    value={values['PAYMENT_MERCHANT_ID'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_MERCHANT_ID: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                  />
+                  <TextField
+                    size="small"
+                    label={l.paymentCurrency}
+                    value={values['PAYMENT_CURRENCY'] ?? 'SAR'}
+                    onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_CURRENCY: e.target.value }))}
+                    disabled={!isAdmin}
+                    sx={{ maxWidth: 140 }}
+                  />
+                </Stack>
+              </Box>
+
+              {/* API keys */}
+              <Box sx={{ border: 1.5, borderColor: 'warning.main', borderRadius: 2, p: 2, mb: 2.5 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                  <LockIcon color="warning" fontSize="small" />
+                  <Typography variant="subtitle2" fontWeight={800} color="warning.main">
+                    {lang === 'ar' ? 'مفاتيح API' : 'API Keys'}
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                  {l.paymentApiNote}
+                </Typography>
+                <Stack spacing={1.5}>
+                  <TextField
+                    size="small"
+                    label={l.paymentApiKey}
+                    type="password"
+                    value={values['PAYMENT_API_KEY'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_API_KEY: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    autoComplete="new-password"
+                  />
+                  <TextField
+                    size="small"
+                    label={l.paymentPublicKey}
+                    value={values['PAYMENT_PUBLIC_KEY'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_PUBLIC_KEY: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                  />
+                  <TextField
+                    size="small"
+                    label={l.paymentWebhook}
+                    value={values['PAYMENT_WEBHOOK_URL'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, PAYMENT_WEBHOOK_URL: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="https://your-server.com/api/payments/webhook"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkIcon fontSize="small" color="action" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
+                </Stack>
+              </Box>
+
               {isAdmin && (
                 <Button
                   variant="contained"
+                  color="success"
                   startIcon={savingSection === 'payments' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void saveKeys(PAYMENT_KEYS, 'payments')}
                   disabled={savingSection !== null}
-                  sx={{ mt: 2 }}
+                  sx={{ mt: 1 }}
                 >
                   {savingSection === 'payments' ? l.saving : l.save}
                 </Button>
               )}
-            </>
+            </Box>
           )}
 
           {tab === 5 && (
-            <>
-              {renderSettingFields(['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID'])}
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={(values.WHATSAPP_ENABLED ?? 'false') === 'true'}
-                    onChange={(e) => handleWhatsappToggle(e.target.checked)}
+            <Box sx={{ maxWidth: 680 }}>
+              {/* Connection Credentials */}
+              <Box sx={{ border: 1.5, borderColor: 'success.light', borderRadius: 2, p: 2, mb: 2.5 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                  <WhatsAppIcon sx={{ color: '#25D366', fontSize: 20 }} />
+                  <Typography variant="subtitle2" fontWeight={800} color="success.dark">
+                    {lang === 'ar' ? 'بيانات الاتصال بواتساب بيزنس' : 'WhatsApp Business API Credentials'}
+                  </Typography>
+                </Stack>
+                <Stack spacing={1.5}>
+                  <TextField
+                    size="small"
+                    label={l.whatsappToken}
+                    type="password"
+                    value={values['WHATSAPP_TOKEN'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, WHATSAPP_TOKEN: e.target.value }))}
                     disabled={!isAdmin}
+                    fullWidth
+                    autoComplete="new-password"
+                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment> } }}
                   />
-                }
-                label={<Typography variant="body2">{l.whatsappEnabled}</Typography>}
-              />
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 1, maxWidth: 520 }}>
+                  <TextField
+                    size="small"
+                    label={l.whatsappPhoneId}
+                    value={values['WHATSAPP_PHONE_ID'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, WHATSAPP_PHONE_ID: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="1234567890"
+                  />
+                  <TextField
+                    size="small"
+                    label={l.whatsappBizAccount}
+                    value={values['WHATSAPP_BUSINESS_ACCOUNT_ID'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, WHATSAPP_BUSINESS_ACCOUNT_ID: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    placeholder="1234567890123456"
+                  />
+                  <TextField
+                    size="small"
+                    label={l.whatsappWebhookSecret}
+                    type="password"
+                    value={values['WHATSAPP_WEBHOOK_SECRET'] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, WHATSAPP_WEBHOOK_SECRET: e.target.value }))}
+                    disabled={!isAdmin}
+                    fullWidth
+                    autoComplete="new-password"
+                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment> } }}
+                  />
+                </Stack>
+              </Box>
+
+              {/* Public contact & toggle */}
+              <Box sx={{ border: 1.5, borderColor: 'divider', borderRadius: 2, p: 2, mb: 2.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  {lang === 'ar' ? 'إعدادات العرض والتفعيل' : 'Display & Activation'}
+                </Typography>
+                <TextField
+                  size="small"
+                  label={l.whatsappPublicPhone}
+                  value={values['WHATSAPP_PUBLIC_PHONE'] ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, WHATSAPP_PUBLIC_PHONE: e.target.value }))}
+                  disabled={!isAdmin}
+                  fullWidth
+                  placeholder="+966501234567"
+                  sx={{ mb: 1.5 }}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <WhatsAppIcon sx={{ color: '#25D366', fontSize: 18 }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      color="success"
+                      checked={(values.WHATSAPP_ENABLED ?? 'false') === 'true'}
+                      onChange={(e) => handleWhatsappToggle(e.target.checked)}
+                      disabled={!isAdmin}
+                    />
+                  }
+                  label={<Typography variant="body2" fontWeight={600}>{l.whatsappEnabled}</Typography>}
+                />
+              </Box>
+
+              {/* Test */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
                 <TextField
                   size="small"
                   label={l.whatsappTestPhone}
                   value={whatsappPhone}
                   onChange={(e) => setWhatsappPhone(e.target.value)}
                   fullWidth
+                  placeholder="+966501234567"
                 />
                 <Button
                   variant="outlined"
+                  color="success"
                   disabled={whatsappTesting || !whatsappPhone.trim()}
-                  startIcon={whatsappTesting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                  startIcon={whatsappTesting ? <CircularProgress size={16} color="inherit" /> : <WhatsAppIcon />}
                   onClick={() => void handleWhatsappTest()}
+                  sx={{ whiteSpace: 'nowrap' }}
                 >
                   {l.whatsappTest}
                 </Button>
               </Stack>
+
               {isAdmin && (
                 <Button
                   variant="contained"
+                  color="success"
                   startIcon={savingSection === 'whatsapp' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void handleSaveWhatsapp()}
                   disabled={savingSection !== null}
-                  sx={{ mt: 2, alignSelf: 'flex-start' }}
                 >
                   {savingSection === 'whatsapp' ? l.saving : l.save}
                 </Button>
               )}
-            </>
+            </Box>
           )}
 
           {tab === 6 && (

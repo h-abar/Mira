@@ -185,7 +185,7 @@ export default function NotificationsPage() {
   const formatDate = (value: string): string => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+    return d.toLocaleString('en-GB', {
       dateStyle: 'short',
       timeStyle: 'short',
     });

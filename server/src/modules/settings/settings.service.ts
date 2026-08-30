@@ -87,20 +87,97 @@ export const SETTINGS_DEFINITIONS = {
     labelAr: 'تفعيل واتساب',
     labelEn: 'WhatsApp Enabled',
   },
+  WHATSAPP_BUSINESS_ACCOUNT_ID: {
+    defaultValue: '',
+    labelAr: 'معرف حساب الأعمال (Business Account ID)',
+    labelEn: 'WhatsApp Business Account ID',
+  },
+  WHATSAPP_WEBHOOK_SECRET: {
+    defaultValue: '',
+    labelAr: 'مفتاح Webhook السري',
+    labelEn: 'WhatsApp Webhook Secret',
+  },
+  WHATSAPP_PUBLIC_PHONE: {
+    defaultValue: '',
+    labelAr: 'رقم واتساب العام (للعملاء)',
+    labelEn: 'Public WhatsApp Number (for clients)',
+  },
+  WHATSAPP_MESSAGE_TEMPLATE: {
+    defaultValue: 'تم دفع الفاتورة بنجاح. رقم العملية: {{transactionId}}',
+    labelAr: 'قالب رسالة واتساب عند الدفع',
+    labelEn: 'WhatsApp Message Template (after payment)',
+  },
+  // ---- Social Media ----
+  SOCIAL_INSTAGRAM: {
+    defaultValue: '',
+    labelAr: 'رابط حساب إنستجرام',
+    labelEn: 'Instagram Profile URL',
+  },
+  SOCIAL_FACEBOOK: {
+    defaultValue: '',
+    labelAr: 'رابط حساب فيسبوك',
+    labelEn: 'Facebook Page URL',
+  },
+  SOCIAL_WHATSAPP: {
+    defaultValue: '',
+    labelAr: 'رقم واتساب للتواصل (مثال: 966501234567)',
+    labelEn: 'WhatsApp Contact Number (e.g. 966501234567)',
+  },
+  SOCIAL_SNAPCHAT: {
+    defaultValue: '',
+    labelAr: 'رابط حساب سناب شات',
+    labelEn: 'Snapchat Profile URL',
+  },
+  SOCIAL_TIKTOK: {
+    defaultValue: '',
+    labelAr: 'رابط حساب تيك توك',
+    labelEn: 'TikTok Profile URL',
+  },
+  // ---- Payment ----
+  PAYMENT_GATEWAY: {
+    defaultValue: 'moyasar',
+    labelAr: 'بوابة الدفع الإلكتروني',
+    labelEn: 'Payment Gateway',
+  },
   PAYMENT_METHOD: {
     defaultValue: '',
-    labelAr: 'طريقة الدفع',
-    labelEn: 'Payment Method',
+    labelAr: 'طريقة الدفع الافتراضية',
+    labelEn: 'Default Payment Method',
   },
   PAYMENT_API_KEY: {
     defaultValue: '',
-    labelAr: 'مفتاح API للدفع',
-    labelEn: 'Payment API Key',
+    labelAr: 'مفتاح API السري',
+    labelEn: 'Secret API Key',
   },
   PAYMENT_PUBLIC_KEY: {
     defaultValue: '',
-    labelAr: 'المفتاح العام للدفع',
-    labelEn: 'Payment Public Key',
+    labelAr: 'المفتاح العام (Publishable Key)',
+    labelEn: 'Publishable Key',
+  },
+  PAYMENT_MERCHANT_ID: {
+    defaultValue: '',
+    labelAr: 'معرف التاجر (Merchant ID)',
+    labelEn: 'Merchant ID',
+  },
+  PAYMENT_WEBHOOK_URL: {
+    defaultValue: '',
+    labelAr: 'رابط استقبال إشعارات الدفع (Webhook URL)',
+    labelEn: 'Payment Webhook URL',
+  },
+  PAYMENT_GATEWAY: {
+    defaultValue: 'moyasar',
+    labelAr: 'بوابة الدفع الإلكتروني',
+    labelEn: 'Payment Gateway',
+  },
+  PAYMENT_GATEWAY_ENV: {
+    defaultValue: 'sandbox',
+    labelAr: 'بيئة بوابة الدفع (sandbox/production)',
+    labelEn: 'Gateway Environment',
+  },
+  PAYMENT_CURRENCY: {
+    defaultValue: 'SAR',
+    labelAr: 'عملة المدفوعات',
+    labelEn: 'Payment Currency',
   },
   ZATCA_VAT_NUMBER: {
     defaultValue: '310123456700003',
@@ -186,6 +263,7 @@ const KNOWN_KEYS = Object.keys(SETTINGS_DEFINITIONS) as SettingKey[];
 // Keys that contain secrets — their values are masked in normal GET responses
 const SECRET_KEYS = new Set([
   'WHATSAPP_TOKEN',
+  'WHATSAPP_WEBHOOK_SECRET',
   'PAYMENT_API_KEY',
   'PAYMENT_PUBLIC_KEY',
   'ZATCA_PRIVATE_KEY',

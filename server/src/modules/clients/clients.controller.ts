@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { exportDataset, type ExportLang } from '../../utils/exportHelper';
+import { exportDataset, fmtDate, type ExportLang } from '../../utils/exportHelper';
 import { clientsService, type ClientListParams } from './clients.service';
 
 export const clientsController = {
@@ -60,17 +60,17 @@ export const clientsController = {
         subtitle: isAr ? `إجمالي: ${data.total} عميل` : `Total: ${data.total} clients`,
         lang,
         columns: isAr
-          ? ['#', 'الاسم', 'الهاتف', 'واتساب', 'البريد', 'إجمالي الإنفاق', 'النقاط', 'تاريخ الإنشاء']
-          : ['#', 'Name', 'Phone', 'WhatsApp', 'Email', 'Total Spent', 'Points', 'Created At'],
+          ? ['#', 'الاسم', 'الهاتف', 'واتساب', 'البريد', 'إجمالي الإنفاق (ر.س)', 'النقاط', 'تاريخ الإنشاء']
+          : ['#', 'Name', 'Phone', 'WhatsApp', 'Email', 'Total Spent (SAR)', 'Points', 'Created At'],
         rows: data.items.map((client: any) => [
           client.id,
-          client.name ?? '-',
-          client.phone ?? '-',
-          client.whatsapp ?? '-',
-          client.email ?? '-',
+          client.name ?? '—',
+          client.phone ?? '—',
+          client.whatsapp ?? '—',
+          client.email ?? '—',
           Number(client.totalSpent ?? 0),
           Number(client.points ?? 0),
-          new Date(client.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
+          fmtDate(client.createdAt),
         ]),
       };
       const result = await exportDataset(dataset, format);

@@ -86,10 +86,10 @@ async function exportSuppliers(req: Request, res: Response, next: NextFunction):
         : ['#', 'Name', 'Phone', 'Email', 'Address', 'Active'],
       rows: data.items.map((supplier: any) => [
         supplier.id,
-        supplier.name ?? '-',
-        supplier.phone ?? '-',
-        supplier.email ?? '-',
-        supplier.address ?? '-',
+        supplier.name ?? '—',
+        supplier.phone ?? '—',
+        supplier.email ?? '—',
+        supplier.address ?? '—',
         supplier.isActive ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No'),
       ]),
     };

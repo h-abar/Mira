@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { Document as PDFDocument } from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 
@@ -23,18 +23,58 @@ const FONT_DIR = (() => {
   return path.join(process.cwd(), 'assets', 'fonts');
 })();
 
-function fmtNumber(value: number, lang: ExportLang): string {
-  return Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US');
+const ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+export function containsArabic(text: string): boolean {
+  return ARABIC_REGEX.test(text);
 }
 
-function fmtDate(d: Date, lang: ExportLang): string {
-  return d.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+/**
+ * Format a number cleanly with Western Arabic numerals (1, 2, 3...)
+ * - Integers: 1, 15, 1,250
+ * - Decimals / Money: 15.00, 1,250.50
+ */
+export function fmtNumber(value: number): string {
+  if (typeof value !== 'number' || isNaN(value)) return '0';
+  if (Number.isInteger(value)) {
+    return Number(value).toLocaleString('en-US');
+  }
+  return Number(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
+}
+
+/**
+ * Format monetary values strictly with 2 decimal places
+ */
+export function fmtMoney(value: number): string {
+  if (typeof value !== 'number' || isNaN(value)) return '0.00';
+  return Number(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Format dates cleanly with standard Western numerals (YYYY-MM-DD or DD/MM/YYYY HH:mm)
+ */
+export function fmtDate(d: Date | string | null | undefined): string {
+  if (!d) return '—';
+  const dateObj = typeof d === 'string' ? new Date(d) : d;
+  if (isNaN(dateObj.getTime())) return String(d);
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const hours = String(dateObj.getHours()).padStart(2, '0');
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+
+  // If time is midnight (00:00:00), format as YYYY-MM-DD
+  if (dateObj.getHours() === 0 && dateObj.getMinutes() === 0 && dateObj.getSeconds() === 0) {
+    return `${year}-${month}-${day}`;
+  }
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
@@ -81,13 +121,13 @@ export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
 
   // Row 4 — header
   const headerRow = sheet.getRow(4);
-  headerRow.height = 22;
+  headerRow.height = 24;
   dataset.columns.forEach((header, idx) => {
     const cell = headerRow.getCell(idx + 1);
     cell.value = header;
     cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF880E4F' } };
-    cell.alignment = align(dataset.lang === 'ar' ? 'right' : 'center');
+    cell.alignment = align('center');
     cell.border = {
       top: { style: 'thin', color: { argb: 'FFC2185B' } },
       bottom: { style: 'thin', color: { argb: 'FFC2185B' } },
@@ -97,7 +137,7 @@ export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
   // Data rows
   dataset.rows.forEach((row, rIdx) => {
     const excelRow = sheet.getRow(5 + rIdx);
-    excelRow.height = 20;
+    excelRow.height = 22;
     row.forEach((value, cIdx) => {
       const cell = excelRow.getCell(cIdx + 1);
       cell.value = value;
@@ -107,30 +147,36 @@ export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
         left: { style: 'thin', color: { argb: 'FFE0D5DB' } },
         right: { style: 'thin', color: { argb: 'FFE0D5DB' } },
       };
+
       if (typeof value === 'number') {
-        cell.numFmt = '#,##0.00';
+        if (Number.isInteger(value)) {
+          cell.numFmt = '#,##0';
+        } else {
+          cell.numFmt = '#,##0.00';
+        }
         cell.alignment = align('right');
       } else {
         cell.alignment = align(mainAlign);
       }
+
       if (rIdx % 2 === 1) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6E7EE' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F0F4' } };
       }
     });
   });
 
-  // Column widths (adaptive)
+  // Adaptive column widths with generous margin to avoid ###
   for (let c = 1; c <= colCount; c++) {
-    let len = dataset.columns[c - 1].length + 4;
+    let maxLen = dataset.columns[c - 1].length + 6;
     for (let r = 5; r < 5 + dataset.rows.length; r++) {
       const value = sheet.getRow(r).getCell(c).value;
       const strLen =
         typeof value === 'number'
-          ? value.toLocaleString('en-US').length
+          ? fmtNumber(value).length
           : String(value ?? '').length;
-      len = Math.max(len, strLen + 4);
+      maxLen = Math.max(maxLen, strLen + 6);
     }
-    sheet.getColumn(c).width = Math.min(32, Math.max(14, len));
+    sheet.getColumn(c).width = Math.min(42, Math.max(14, maxLen));
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -139,7 +185,7 @@ export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
 
 export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 36 });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -159,8 +205,7 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
     }
 
     const isAr = dataset.lang === 'ar';
-    const rtl = isAr ? { features: ['rtla'] } : {};
-    const margin = 40;
+    const margin = 36;
     const pageWidth = doc.page.width - margin * 2;
 
     const setFont = (bold: boolean): void => {
@@ -169,19 +214,24 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
     };
 
     // Header band
-    const bandH = 62;
+    const bandH = 60;
     doc.save();
-    doc.roundedRect(margin, margin, pageWidth, bandH, 8).fill('#c2185b');
+    doc.roundedRect(margin, margin, pageWidth, bandH, 6).fill('#c2185b');
     setFont(true);
-    doc.fillColor('#ffffff').fontSize(20).text(dataset.salonName ?? 'Mira', margin + 16, margin + 8, {
-      width: pageWidth - 32,
+
+    const salonTitle = dataset.salonName ?? 'Mira';
+    const titleRtl = containsArabic(salonTitle) ? { features: ['rtla'] } : {};
+    doc.fillColor('#ffffff').fontSize(18).text(salonTitle, margin + 12, margin + 8, {
+      width: pageWidth - 24,
       align: 'center',
-      ...rtl,
+      ...titleRtl,
     });
-    doc.fillColor('#ffffff').fontSize(12).text(dataset.title, margin + 16, margin + 34, {
-      width: pageWidth - 32,
+
+    const datasetTitleRtl = containsArabic(dataset.title) ? { features: ['rtla'] } : {};
+    doc.fillColor('#ffffff').fontSize(12).text(dataset.title, margin + 12, margin + 34, {
+      width: pageWidth - 24,
       align: 'center',
-      ...rtl,
+      ...datasetTitleRtl,
     });
     doc.restore();
 
@@ -189,54 +239,91 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
     setFont(false);
     doc.fontSize(9);
     const subtitle = dataset.subtitle ?? '';
-    const subH = doc.heightOfString(subtitle, { width: pageWidth - 16, ...rtl });
-    doc.fillColor('#777777').text(subtitle, margin + 8, margin + bandH + 10, {
+    const subtitleRtl = containsArabic(subtitle) ? { features: ['rtla'] } : {};
+    const subH = doc.heightOfString(subtitle, { width: pageWidth - 16, ...subtitleRtl });
+    doc.fillColor('#666666').text(subtitle, margin + 8, margin + bandH + 8, {
       width: pageWidth - 16,
       align: 'center',
-      ...rtl,
+      ...subtitleRtl,
     });
 
     // Footer (page numbers + generation date)
-    let pageNo = 0;
+    let pageNo = 1;
     const drawFooter = (): void => {
       setFont(false);
-      doc.fillColor('#aaaaaa').fontSize(8);
-      const genLabel = isAr ? 'تم الإنشاء' : 'Generated';
+      doc.fillColor('#999999').fontSize(8);
+      const genLabel = isAr ? 'تاريخ الإنشاء' : 'Generated';
       const pageLabel = isAr ? 'صفحة' : 'Page';
+      const dateText = `${genLabel}: ${fmtDate(new Date())}`;
+      const dateRtl = isAr ? { features: ['rtla'] } : {};
+
       doc.text(
-        `${genLabel}: ${fmtDate(new Date(), dataset.lang)}`,
+        dateText,
         margin,
-        doc.page.height - doc.page.margins.bottom - 12,
-        { width: pageWidth / 2, align: 'left', ...rtl },
+        doc.page.height - doc.page.margins.bottom - 10,
+        { width: pageWidth / 2, align: 'left', ...dateRtl },
       );
       doc.text(
         `${pageLabel} ${pageNo}`,
         margin + pageWidth / 2,
-        doc.page.height - doc.page.margins.bottom - 12,
-        { width: pageWidth / 2, align: 'right', ...rtl },
+        doc.page.height - doc.page.margins.bottom - 10,
+        { width: pageWidth / 2, align: 'right', ...dateRtl },
       );
     };
+
     doc.on('pageAdded', () => {
       pageNo += 1;
       drawFooter();
     });
 
-    // Table
-    const colWidth = pageWidth / dataset.columns.length;
-    const pad = 5;
-    const minRowH = 20;
-    const cellText = (cell: string | number): string =>
-      typeof cell === 'number' ? fmtNumber(cell, dataset.lang) : String(cell);
+    // Calculate adaptive column widths based on column headers and content
+    const numCols = dataset.columns.length;
+    const colWeights: number[] = new Array(numCols).fill(1);
 
-    const measure = (cells: (string | number)[], bold: boolean): number => {
-      setFont(bold);
-      doc.fontSize(bold ? 9 : 8.5);
-      let h = minRowH;
-      cells.forEach((cell) => {
-        const cellH = doc.heightOfString(cellText(cell), { width: colWidth - pad * 2, ...rtl });
-        h = Math.max(h, cellH + 7);
+    // Give narrower width for short numeric / ID columns and wider for names/descriptions
+    dataset.columns.forEach((col, idx) => {
+      let maxLen = col.length;
+      dataset.rows.slice(0, 30).forEach((row) => {
+        const val = row[idx];
+        const len = typeof val === 'number' ? fmtNumber(val).length : String(val ?? '').length;
+        maxLen = Math.max(maxLen, len);
       });
-      return h;
+      if (maxLen <= 4) colWeights[idx] = 0.6;
+      else if (maxLen <= 8) colWeights[idx] = 0.8;
+      else if (maxLen <= 14) colWeights[idx] = 1.0;
+      else if (maxLen <= 22) colWeights[idx] = 1.4;
+      else colWeights[idx] = 1.8;
+    });
+
+    const totalWeight = colWeights.reduce((a, b) => a + b, 0);
+    const colWidths = colWeights.map((w) => (w / totalWeight) * pageWidth);
+
+    // Calculate column X positions
+    const colOffsets: number[] = [];
+    let currentX = margin;
+    for (let i = 0; i < numCols; i++) {
+      colOffsets.push(currentX);
+      currentX += colWidths[i];
+    }
+
+    const pad = 4;
+    const minRowH = 20;
+
+    const cellText = (cell: string | number): string =>
+      typeof cell === 'number' ? fmtNumber(cell) : String(cell ?? '—');
+
+    const measureRow = (cells: (string | number)[], bold: boolean): number => {
+      setFont(bold);
+      doc.fontSize(bold ? 8.5 : 8);
+      let maxH = minRowH;
+      cells.forEach((cell, cIdx) => {
+        const text = cellText(cell);
+        const hasArabic = containsArabic(text);
+        const rtlOpt = hasArabic ? { features: ['rtla'] } : {};
+        const cellH = doc.heightOfString(text, { width: colWidths[cIdx] - pad * 2, ...rtlOpt });
+        maxH = Math.max(maxH, cellH + 6);
+      });
+      return maxH;
     };
 
     const drawRow = (
@@ -246,38 +333,61 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
       rowH: number,
       bg: string | null,
     ): void => {
-      if (bg) doc.rect(margin, rowY, pageWidth, rowH).fill(bg);
+      if (bg) {
+        doc.rect(margin, rowY, pageWidth, rowH).fill(bg);
+      }
+      // Light border underneath
+      doc.rect(margin, rowY + rowH - 0.5, pageWidth, 0.5).fill('#e0d5db');
+
       setFont(bold);
-      doc.fontSize(bold ? 9 : 8.5);
+      doc.fontSize(bold ? 8.5 : 8);
       doc.fillColor(bold ? '#ffffff' : '#222222');
-      cells.forEach((cell, c) => {
-        const x = isAr ? margin + pageWidth - (c + 1) * colWidth : margin + c * colWidth;
+
+      cells.forEach((cell, cIdx) => {
+        // In Arabic layout, columns order from right to left across the page
+        const visualColIdx = isAr ? numCols - 1 - cIdx : cIdx;
+        const x = colOffsets[visualColIdx];
+        const width = colWidths[cIdx];
         const text = cellText(cell);
-        const cellH = doc.heightOfString(text, { width: colWidth - pad * 2, ...rtl });
+        const isNum = typeof cell === 'number';
+        const hasArabic = containsArabic(text);
+
+        // Crucial fix: DO NOT apply { features: ['rtla'] } to pure numbers, codes, or dates!
+        const rtlOption = hasArabic ? { features: ['rtla'] } : {};
+        const alignOption: 'center' | 'left' | 'right' = bold
+          ? 'center'
+          : isNum
+          ? 'right'
+          : hasArabic
+          ? (isAr ? 'right' : 'left')
+          : 'center';
+
+        const cellH = doc.heightOfString(text, { width: width - pad * 2, ...rtlOption });
         doc.text(text, x + pad, rowY + (rowH - cellH) / 2, {
-          width: colWidth - pad * 2,
-          ...rtl,
+          width: width - pad * 2,
+          align: alignOption,
+          ...rtlOption,
         });
       });
     };
 
-    const headerH = measure(dataset.columns, true);
+    const headerH = measureRow(dataset.columns, true);
     const drawHeader = (): void => {
       drawRow(dataset.columns, true, y, headerH, '#880e4f');
       y += headerH;
     };
 
-    let y = margin + bandH + 12 + subH + 10;
+    let y = margin + bandH + 10 + subH + 8;
     drawHeader();
 
     dataset.rows.forEach((row, idx) => {
-      const rh = measure(row, false);
-      if (y + rh > doc.page.height - doc.page.margins.bottom - 18) {
+      const rh = measureRow(row, false);
+      if (y + rh > doc.page.height - doc.page.margins.bottom - 16) {
         doc.addPage();
         y = doc.page.margins.top;
         drawHeader();
       }
-      drawRow(row, false, y, rh, idx % 2 === 1 ? '#f6e7ee' : null);
+      drawRow(row, false, y, rh, idx % 2 === 1 ? '#fcf4f7' : null);
       y += rh;
     });
 
@@ -289,11 +399,13 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
 export async function exportDataset(
   dataset: ExportDataset,
   format: 'excel' | 'pdf',
-): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+): Promise<{ buffer: Buffer; contentType: string; mime: string; extension: string }> {
   if (format === 'excel') {
     const buffer = await buildExcel(dataset);
-    return { buffer, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', extension: 'xlsx' };
+    const contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return { buffer, contentType, mime: contentType, extension: 'xlsx' };
   }
   const buffer = await buildPdf(dataset);
-  return { buffer, contentType: 'application/pdf', extension: 'pdf' };
+  const contentType = 'application/pdf';
+  return { buffer, contentType, mime: contentType, extension: 'pdf' };
 }

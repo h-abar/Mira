@@ -1,7 +1,19 @@
 import { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
-import { exportDataset, type ExportLang } from '../../utils/exportHelper';
-import { purchasesService, type PurchaseListQuery } from './purchases.service';
+import { exportDataset, fmtDate, type ExportLang } from '../../utils/exportHelper';
+import {
+  purchasesService,
+  type PurchaseCreateInput,
+  type PurchaseListQuery,
+} from './purchases.service';
+
+function parseId(value: string): number {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new ApiError(400, 'Invalid purchase order ID');
+  }
+  return id;
+}
 
 async function createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -9,18 +21,8 @@ async function createPurchase(req: Request, res: Response, next: NextFunction): 
     if (!userId) {
       throw new ApiError(401, 'Unauthorized');
     }
-    const data = await purchasesService.createPurchase(req.body, userId);
+    const data = await purchasesService.createPurchase(req.body as PurchaseCreateInput, userId);
     res.status(201).json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-}
-
-async function listPurchases(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const query = (res.locals.purchaseQuery ?? {}) as PurchaseListQuery;
-    const data = await purchasesService.listPurchases(query);
-    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -28,11 +30,18 @@ async function listPurchases(req: Request, res: Response, next: NextFunction): P
 
 async function getPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const id = Number(req.params.id);
-    if (!id || Number.isNaN(id)) {
-      throw new ApiError(400, 'Invalid purchase order ID');
-    }
+    const id = parseId(req.params.id);
     const data = await purchasesService.getPurchase(id);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listPurchases(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const query = (res.locals.purchaseQuery ?? req.query ?? {}) as PurchaseListQuery;
+    const data = await purchasesService.listPurchases(query);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -41,10 +50,7 @@ async function getPurchase(req: Request, res: Response, next: NextFunction): Pro
 
 async function receivePurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const id = Number(req.params.id);
-    if (!id || Number.isNaN(id)) {
-      throw new ApiError(400, 'Invalid purchase order ID');
-    }
+    const id = parseId(req.params.id);
     const userId = req.user?.id;
     if (!userId) {
       throw new ApiError(401, 'Unauthorized');
@@ -58,10 +64,7 @@ async function receivePurchase(req: Request, res: Response, next: NextFunction):
 
 async function cancelPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const id = Number(req.params.id);
-    if (!id || Number.isNaN(id)) {
-      throw new ApiError(400, 'Invalid purchase order ID');
-    }
+    const id = parseId(req.params.id);
     const data = await purchasesService.cancelPurchase(id);
     res.json({ success: true, data });
   } catch (err) {
@@ -94,15 +97,15 @@ async function exportPurchases(req: Request, res: Response, next: NextFunction):
       subtitle: isAr ? `إجمالي: ${data.total} أمر` : `Total: ${data.total} orders`,
       lang,
       columns: isAr
-        ? ['#', 'التاريخ', 'المورد', 'الإجمالي', 'الحالة', 'بواسطة']
-        : ['#', 'Date', 'Supplier', 'Total', 'Status', 'Created By'],
+        ? ['#', 'التاريخ', 'المورد', 'الإجمالي (ر.س)', 'الحالة', 'بواسطة']
+        : ['#', 'Date', 'Supplier', 'Total (SAR)', 'Status', 'Created By'],
       rows: data.items.map((po: any) => [
         po.id,
-        new Date(po.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
-        po.supplier?.name ?? '-',
+        fmtDate(po.date),
+        po.supplier?.name ?? '—',
         Number(po.total ?? 0),
-        po.status ?? '-',
-        po.creator?.username ?? '-',
+        po.status ?? '—',
+        po.creator?.username ?? '—',
       ]),
     };
     const result = await exportDataset(dataset, format);

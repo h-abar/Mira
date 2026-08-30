@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
-import { exportDataset, type ExportLang } from '../../utils/exportHelper';
+import { exportDataset, fmtDate, type ExportLang } from '../../utils/exportHelper';
 import { employeesService, type EmployeeCreateData } from './employees.service';
 
 function parseId(value: string): number {
@@ -71,16 +71,16 @@ async function exportEmployees(req: Request, res: Response, next: NextFunction):
       subtitle: isAr ? `إجمالي: ${items.length} موظف` : `Total: ${items.length} employees`,
       lang,
       columns: isAr
-        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'الهاتف', 'الدور', 'نسبة العمولة', 'تاريخ التوظيف', 'نشط']
-        : ['#', 'Name (Ar)', 'Name (En)', 'Phone', 'Role', 'Commission Rate', 'Hire Date', 'Active'],
+        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'الهاتف', 'الدور', 'نسبة العمولة %', 'تاريخ التوظيف', 'نشط']
+        : ['#', 'Name (Ar)', 'Name (En)', 'Phone', 'Role', 'Commission Rate %', 'Hire Date', 'Active'],
       rows: items.map((emp: any) => [
         emp.id,
-        emp.nameAr ?? '-',
-        emp.nameEn ?? '-',
-        emp.phone ?? '-',
-        emp.role ?? '-',
+        emp.nameAr ?? '—',
+        emp.nameEn ?? '—',
+        emp.phone ?? '—',
+        emp.role ?? '—',
         Number(emp.commissionRate ?? 0),
-        emp.hireDate ? new Date(emp.hireDate).toLocaleDateString(isAr ? 'ar-EG' : 'en-US') : '-',
+        emp.hireDate ? fmtDate(emp.hireDate) : '—',
         emp.isActive ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No'),
       ]),
     };

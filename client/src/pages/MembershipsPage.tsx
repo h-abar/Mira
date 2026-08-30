@@ -395,14 +395,14 @@ export default function MembershipsPage() {
       field: 'startDate',
       headerName: l.startDate,
       width: 130,
-      renderCell: (params) => new Date(params.value as string).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US'),
+      renderCell: (params) => new Date(params.value as string).toLocaleDateString('en-GB'),
     },
     {
       field: 'endDate',
       headerName: l.endDate,
       width: 190,
       renderCell: (params) => {
-        const d = new Date(params.value as string).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US');
+        const d = new Date(params.value as string).toLocaleDateString('en-GB');
         const hijri = toHijri(params.value as string);
         return (
           <Stack direction="column" spacing={0}>

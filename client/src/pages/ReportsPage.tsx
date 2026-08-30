@@ -176,7 +176,13 @@ const L = {
 
 const CHART_COLORS = ['#c2185b', '#f48fb1', '#7b1fa2', '#f9a825', '#2e7d32', '#1565c0', '#d84315'];
 
-const money = (value: number) => Number(value).toLocaleString();
+const money = (value: number) => {
+  if (typeof value !== 'number' || isNaN(value)) return '0.00';
+  return Number(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
 
 function SimpleTable({
   headers,
@@ -381,8 +387,13 @@ export default function ReportsPage() {
     const win = window.open('', '_blank', 'width=960,height=720');
     if (!win) return;
 
-    const fmt = (value: number) =>
-      Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB');
+    const fmt = (value: number) => {
+      if (typeof value !== 'number' || isNaN(value)) return '0.00';
+      return Number(value).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    };
 
     const tableHtml = (
       title: string,
@@ -409,12 +420,12 @@ export default function ReportsPage() {
         : '';
 
     const shiftRows = shifts.map((row) => {
-      const start = new Date(row.startTime).toLocaleString(
-        lang === 'ar' ? 'ar-EG' : 'en-GB',
-        { dateStyle: 'short', timeStyle: 'short' },
-      );
+      const start = new Date(row.startTime).toLocaleString('en-GB', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      });
       const end = row.endTime
-        ? new Date(row.endTime).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+        ? new Date(row.endTime).toLocaleString('en-GB', {
             dateStyle: 'short',
             timeStyle: 'short',
           })
@@ -450,6 +461,8 @@ export default function ReportsPage() {
         : `<div class="qr-block">${qrPayload}</div>`;
     const vatLabel = vatNumber || ZATCA_VAT_NUMBER;
 
+    const curr = lang === 'ar' ? 'ر.س' : 'SAR';
+
     const content = `
   <div class="header">
     <div class="salon">${salonName || t('general.appName')}</div>
@@ -460,36 +473,36 @@ export default function ReportsPage() {
   </div>
   ${
     summary
-      ? `<table class="kpi"><tr><th>${l.revenue}</th><th>${l.expenses}</th><th>${l.profit}</th></tr><tr><td>${fmt(summary.revenue)}</td><td>${fmt(summary.expenses)}</td><td>${fmt(summary.profit)}</td></tr></table>`
+      ? `<table class="kpi"><tr><th>${l.revenue} (${curr})</th><th>${l.expenses} (${curr})</th><th>${l.profit} (${curr})</th></tr><tr><td>${fmt(summary.revenue)}</td><td>${fmt(summary.expenses)}</td><td>${fmt(summary.profit)}</td></tr></table>`
       : ''
   }
   ${tableHtml(
     l.salesByDay,
-    [lang === 'ar' ? 'التاريخ' : 'Date', l.revenueShort, l.invoices],
+    [lang === 'ar' ? 'التاريخ' : 'Date', `${l.revenueShort} (${curr})`, l.invoices],
     sales.map((point) => [point.label, fmt(point.total), point.count]),
     l.noData,
   )}
   ${tableHtml(
     l.paymentMethods,
-    [lang === 'ar' ? 'الطريقة' : 'Method', l.invoices, l.total],
+    [lang === 'ar' ? 'الطريقة' : 'Method', l.invoices, `${l.total} (${curr})`],
     payments.map((row) => [methodLabel(row.method), row.count, fmt(row.total)]),
     l.noData,
   )}
   ${tableHtml(
     l.topServices,
-    [l.rank, l.service, l.quantity, l.revenueShort],
+    [l.rank, l.service, l.quantity, `${l.revenueShort} (${curr})`],
     services.map((row, idx) => [idx + 1, `${row.nameAr} / ${row.nameEn}`, row.quantity, fmt(row.revenue)]),
     l.noData,
   )}
   ${tableHtml(
     l.topClients,
-    [l.rank, l.client, l.total],
+    [l.rank, l.client, `${l.total} (${curr})`],
     clients.map((row, idx) => [idx + 1, row.name, fmt(row.total)]),
     l.noData,
   )}
   ${tableHtml(
     l.employeePerformance,
-    [l.employee, l.invoices, l.revenueShort, l.commission],
+    [l.employee, l.invoices, `${l.revenueShort} (${curr})`, `${l.commission} (${curr})`],
     employees.map((row) => [`${row.nameAr} / ${row.nameEn}`, row.invoiceCount, fmt(row.total), fmt(row.commission)]),
     l.noData,
   )}
@@ -501,19 +514,19 @@ export default function ReportsPage() {
       l.shiftStatus,
       l.branchShort,
       l.invoices,
-      l.revenueShort,
-      l.cash,
-      l.card,
-      l.expectedCash,
-      l.actualCash,
-      l.difference,
+      `${l.revenueShort} (${curr})`,
+      `${l.cash} (${curr})`,
+      `${l.card} (${curr})`,
+      `${l.expectedCash} (${curr})`,
+      `${l.actualCash} (${curr})`,
+      `${l.difference} (${curr})`,
     ],
     shiftRows,
     l.noData,
   )}
   ${tableHtml(
     l.expensesByCategory,
-    [l.category, l.amount],
+    [l.category, `${l.amount} (${curr})`],
     expenses.map((row) => [row.category, fmt(row.amount)]),
     l.noData,
   )}
@@ -980,12 +993,12 @@ export default function ReportsPage() {
               l.difference,
             ]}
             rows={shifts.map((row) => {
-              const start = new Date(row.startTime).toLocaleString(
-                lang === 'ar' ? 'ar-EG' : 'en-GB',
-                { dateStyle: 'short', timeStyle: 'short' },
-              );
+              const start = new Date(row.startTime).toLocaleString('en-GB', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              });
               const end = row.endTime
-                ? new Date(row.endTime).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+                ? new Date(row.endTime).toLocaleString('en-GB', {
                     dateStyle: 'short',
                     timeStyle: 'short',
                   })

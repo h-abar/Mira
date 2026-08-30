@@ -1,4 +1,4 @@
-﻿import { NextFunction, Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { exportDataset, type ExportLang } from '../../utils/exportHelper';
 import { membershipsService } from './memberships.service';
 import { getActiveMembership } from './membershipDiscount';
@@ -122,12 +122,12 @@ async function exportPlans(req: Request, res: Response, next: NextFunction) {
       subtitle: isAr ? `إجمالي: ${items.length} باقة` : `Total: ${items.length} plans`,
       lang,
       columns: isAr
-        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'السعر', 'مدة (أيام)', 'نسبة الخصم %', 'عدد الأعضاء', 'نشط']
-        : ['#', 'Name (Ar)', 'Name (En)', 'Price', 'Duration Days', 'Discount %', 'Members Count', 'Active'],
+        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'السعر (ر.س)', 'المدة (أيام)', 'نسبة الخصم %', 'عدد الأعضاء', 'نشط']
+        : ['#', 'Name (Ar)', 'Name (En)', 'Price (SAR)', 'Duration (Days)', 'Discount %', 'Members Count', 'Active'],
       rows: items.map((plan: any) => [
         plan.id,
-        plan.nameAr ?? '-',
-        plan.nameEn ?? '-',
+        plan.nameAr ?? '—',
+        plan.nameEn ?? '—',
         Number(plan.price ?? 0),
         Number(plan.durationDays ?? 0),
         Number(plan.discountPercent ?? 0),

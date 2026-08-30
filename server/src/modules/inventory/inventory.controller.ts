@@ -84,16 +84,16 @@ async function exportProducts(req: Request, res: Response, next: NextFunction): 
       subtitle: isAr ? `إجمالي: ${items.length} منتج` : `Total: ${items.length} products`,
       lang,
       columns: isAr
-        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'الباركود', 'الفئة', 'الكمية', 'الوحدة', 'سعر التكلفة', 'سعر البيع', 'الحد الأدنى', 'نشط']
-        : ['#', 'Name (Ar)', 'Name (En)', 'Barcode', 'Category', 'Quantity', 'Unit', 'Cost Price', 'Sale Price', 'Min Stock', 'Active'],
+        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'الباركود', 'الفئة', 'الكمية', 'الوحدة', 'سعر التكلفة (ر.س)', 'سعر البيع (ر.س)', 'الحد الأدنى', 'نشط']
+        : ['#', 'Name (Ar)', 'Name (En)', 'Barcode', 'Category', 'Quantity', 'Unit', 'Cost Price (SAR)', 'Sale Price (SAR)', 'Min Stock', 'Active'],
       rows: items.map((product: any) => [
         product.id,
-        product.nameAr ?? '-',
-        product.nameEn ?? '-',
-        product.barcode ?? '-',
-        product.category ?? '-',
+        product.nameAr ?? '—',
+        product.nameEn ?? '—',
+        product.barcode ?? '—',
+        product.category ?? '—',
         Number(product.quantity ?? 0),
-        product.unit ?? '-',
+        product.unit ?? '—',
         Number(product.costPrice ?? 0),
         Number(product.salePrice ?? 0),
         Number(product.minStock ?? 0),

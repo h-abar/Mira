@@ -287,11 +287,11 @@ export default function ShiftStatusBar() {
                       {isAr ? 'وقت البدء:' : 'Started At:'}
                     </Typography>
                     <Typography variant="body2">
-                      {new Date(activeShift.startTime).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', {
+                      {new Date(activeShift.startTime).toLocaleTimeString('en-GB', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}{' '}
-                      - {new Date(activeShift.startTime).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}
+                      - {new Date(activeShift.startTime).toLocaleDateString('en-GB')}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>

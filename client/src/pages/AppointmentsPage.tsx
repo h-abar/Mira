@@ -1216,7 +1216,7 @@ export default function AppointmentsPage() {
   </div>
   <hr class="solid" />
   <div class="row"><span>${lang === 'ar' ? 'رقم الفاتورة' : 'Invoice No.'}:</span><span>${invoice.invoiceNo}</span></div>
-  <div class="row"><span>${lang === 'ar' ? 'التاريخ' : 'Date'}:</span><span>${new Date(invoice.date).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}</span></div>
+  <div class="row"><span>${lang === 'ar' ? 'التاريخ' : 'Date'}:</span><span>${new Date(invoice.date).toLocaleDateString('en-GB')}</span></div>
   <div class="row"><span>${L.client}:</span><span>${clientInfo.name}</span></div>
   ${invoice.employee ? `<div class="row"><span>${L.employee}:</span><span>${nameOf(invoice.employee)}</span></div>` : ''}
   <div class="center" style="margin:4px 0"><img class="barcode" src="${barcode}" alt="${invoice.invoiceNo}" /></div>

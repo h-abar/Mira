@@ -351,11 +351,11 @@ function SummaryCard({
   color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
 }) {
   return (
-    <Card sx={{ p: 2 }}>
-      <Typography variant="body2" color="text.secondary">
+    <Card sx={{ p: 1.5 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.25 }}>
         {label}
       </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700 }} color={color}>
+      <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }} color={color}>
         {value}
       </Typography>
     </Card>
@@ -420,11 +420,11 @@ export default function AccountingPage() {
   const formatDate = (value: string): string => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-GB');
+    return date.toLocaleDateString('en-GB');
   };
 
   const formatMoney = (value: string | number): string =>
-    Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+    Number(value).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -1138,7 +1138,7 @@ export default function AccountingPage() {
       )}
 
       {tab === 2 && (
-        <Stack spacing={2}>
+        <Stack spacing={1.5}>
           <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <DatePicker label={L.date} value={summaryDate} onChange={(value: Dayjs | null) => setSummaryDate(value)} />
             <Button
@@ -1150,9 +1150,9 @@ export default function AccountingPage() {
               {L.show}
             </Button>
           </Stack>
-          <Grid container spacing={2}>
+          <Grid container spacing={1.5}>
             {summaryCards.map((card) => (
-              <Grid key={card.key} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid key={card.key} size={{ xs: 6, sm: 4, md: 3 }}>
                 <SummaryCard label={card.label} value={card.value} color={card.color} />
               </Grid>
             ))}

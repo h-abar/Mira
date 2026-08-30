@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { ApiError } from '../../utils/ApiError';
 
-const PAYMENT_CONFIG_KEYS = ['PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY'] as const;
+const PAYMENT_CONFIG_KEYS = ['PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY', 'PAYMENT_GATEWAY', 'PAYMENT_GATEWAY_ENV'] as const;
 
 export interface PaymentConfig {
   method: string | null;
@@ -12,7 +12,12 @@ export interface PaymentConfig {
   configured: boolean;
 }
 
-export async function getPaymentConfig(): Promise<PaymentConfig> {
+export interface ExtendedPaymentConfig extends PaymentConfig {
+  gateway: string | null;
+  gatewayEnv: string | null;
+}
+
+export async function getPaymentConfig(): Promise<ExtendedPaymentConfig> {
   const rows = await prisma.setting.findMany({
     where: { key: { in: [...PAYMENT_CONFIG_KEYS] } },
   });
@@ -20,7 +25,16 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
   const method = map.get('PAYMENT_METHOD') ?? null;
   const apiKey = map.get('PAYMENT_API_KEY') ?? null;
   const publicKey = map.get('PAYMENT_PUBLIC_KEY') ?? null;
-  return { method, apiKey, publicKey, configured: Boolean(apiKey && publicKey) };
+  const gateway = map.get('PAYMENT_GATEWAY') ?? null;
+  const gatewayEnv = map.get('PAYMENT_GATEWAY_ENV') ?? null;
+  return {
+    method,
+    apiKey,
+    publicKey,
+    gateway,
+    gatewayEnv,
+    configured: Boolean(apiKey && publicKey),
+  };
 }
 
 export interface PaymentCreateInput {
@@ -55,6 +69,13 @@ async function createPayment(input: PaymentCreateInput) {
     }
   }
 
+  // Choose gateway based on config
+  let gatewayInstance: any = null;
+  if (config.gateway && config.gateway === 'moyasar') {
+    gatewayInstance = new MoyasarGateway({ apiKey: config.apiKey, publicKey: config.publicKey, env: config.gatewayEnv ?? 'sandbox' });
+  }
+  // Additional gateways can be added here (e.g., Stripe)
+
   const pending = await prisma.payment.create({
     data: {
       invoiceId: input.invoiceId ?? null,
@@ -65,7 +86,15 @@ async function createPayment(input: PaymentCreateInput) {
     },
   });
 
-  const transactionId = `SIMULATED-${randomUUID()}`;
+  // Simulate or perform real charge
+  let transactionId: string;
+  if (gatewayInstance) {
+    const chargeResult = await gatewayInstance.createCharge({ amount: input.amount, currency: 'SAR', method: input.method });
+    transactionId = chargeResult.transactionId;
+  } else {
+    transactionId = `SIMULATED-${randomUUID()}`;
+  }
+
   const paid = await prisma.payment.update({
     where: { id: pending.id },
     data: { status: 'PAID', transactionId },
@@ -85,6 +114,22 @@ async function createPayment(input: PaymentCreateInput) {
     }
   }
 
+  // Send WhatsApp notification if configured
+  try {
+    const whatsappConfig = await settingsService.getAll();
+    const tokenItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_TOKEN');
+    const phoneIdItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_PHONE_ID');
+    if (tokenItem && phoneIdItem && tokenItem.value !== '••••••••' && phoneIdItem.value !== '••••••••') {
+      const messageTemplateItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_MESSAGE_TEMPLATE');
+      const template = messageTemplateItem?.value || 'تم دفع الفاتورة بنجاح. رقم العملية: {{transactionId}}';
+      const message = template.replace('{{transactionId}}', paid.transactionId ?? '');
+      await sendWhatsAppMessage(tokenItem.value, phoneIdItem.value, message);
+    }
+  } catch (e) {
+    // Log but do not fail payment
+    console.error('Failed to send WhatsApp notification', e);
+  }
+
   return {
     id: paid.id,
     status: paid.status,
@@ -93,8 +138,8 @@ async function createPayment(input: PaymentCreateInput) {
     invoiceId: paid.invoiceId,
     appointmentId: paid.appointmentId,
     transactionId: paid.transactionId,
-    simulated: true,
-    gateway: config.method,
+    simulated: !gatewayInstance,
+    gateway: config.gateway ?? null,
     gatewayConfigured: config.configured,
   };
 }

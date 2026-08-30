@@ -754,7 +754,7 @@ export default function POSPage() {
   </div>
   <hr class="solid" />
   <div class="row"><span>${lang === 'ar' ? 'رقم الفاتورة' : 'Invoice No.'}:</span><span>${successInvoice.invoiceNo}</span></div>
-  <div class="row"><span>${lang === 'ar' ? 'التاريخ' : 'Date'}:</span><span>${new Date(successInvoice.date).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}</span></div>
+  <div class="row"><span>${lang === 'ar' ? 'التاريخ' : 'Date'}:</span><span>${new Date(successInvoice.date).toLocaleDateString('en-GB')}</span></div>
   <div class="row"><span>${l.client}:</span><span>${selectedClient?.name ?? successInvoice.client?.name ?? '—'}</span></div>
   <div class="row"><span>${l.employee}:</span><span>${successInvoice.employee ? nameOf(successInvoice.employee) : employees.find((e) => e.id === Number(employeeId)) ? nameOf(employees.find((e) => e.id === Number(employeeId))!) : '—'}</span></div>
   <div class="center" style="margin:4px 0"><img class="barcode" src="${barcode}" alt="${successInvoice.invoiceNo}" /></div>

@@ -1,5 +1,5 @@
 import { type NextFunction, type Request, type Response } from 'express';
-import { exportDataset, type ExportLang } from '../../utils/exportHelper';
+import { exportDataset, fmtDate, type ExportLang } from '../../utils/exportHelper';
 import { appointmentsService } from './appointments.service';
 import {
   appointmentCreateSchema,
@@ -123,16 +123,16 @@ export const appointmentsController = {
         subtitle: isAr ? `إجمالي: ${items.length} موعد` : `Total: ${items.length} appointments`,
         lang,
         columns: isAr
-          ? ['#', 'التاريخ', 'الوقت', 'العميل', 'الموظف', 'الخدمة', 'الحالة', 'المدة']
-          : ['#', 'Date', 'Time', 'Client', 'Employee', 'Service', 'Status', 'Duration'],
+          ? ['#', 'التاريخ', 'الوقت', 'العميل', 'الموظف', 'الخدمة', 'الحالة', 'المدة (دقيقة)']
+          : ['#', 'Date', 'Time', 'Client', 'Employee', 'Service', 'Status', 'Duration (min)'],
         rows: items.map((appt: any) => [
           appt.id,
-          new Date(appt.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
-          appt.startTime ?? '-',
-          appt.client?.name ?? '-',
-          isAr ? (appt.employee?.nameAr ?? '-') : (appt.employee?.nameEn ?? '-'),
-          isAr ? (appt.service?.nameAr ?? '-') : (appt.service?.nameEn ?? '-'),
-          appt.status ?? '-',
+          fmtDate(appt.date),
+          appt.startTime ?? '—',
+          appt.client?.name ?? '—',
+          isAr ? (appt.employee?.nameAr ?? '—') : (appt.employee?.nameEn ?? '—'),
+          isAr ? (appt.service?.nameAr ?? '—') : (appt.service?.nameEn ?? '—'),
+          appt.status ?? '—',
           Number(appt.service?.durationMinutes ?? 0),
         ]),
       };

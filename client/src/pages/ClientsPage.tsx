@@ -234,7 +234,7 @@ export default function ClientsPage() {
   const formatDate = (value: string): string => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-GB');
+    return d.toLocaleString('en-GB');
   };
 
   const nameOfService = (service: { nameAr: string; nameEn: string }): string =>

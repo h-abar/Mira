@@ -144,14 +144,14 @@ export default function AttendancePage() {
     if (!value) return l.notFound;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return l.notFound;
-    return d.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-GB');
+    return d.toLocaleDateString('en-GB');
   };
 
   const formatTime = (value?: string | null): string => {
     if (!value) return l.notFound;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return l.notFound;
-    return d.toLocaleTimeString(lang === 'ar' ? 'ar-EG' : 'en-GB', {
+    return d.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
     });
