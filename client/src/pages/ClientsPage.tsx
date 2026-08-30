@@ -54,6 +54,7 @@ import {
 } from '../api/loyalty';
 import { useAuthStore } from '../stores/authStore';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const getErrorMessage = (err: unknown): string => {
   if (err && typeof err === 'object' && 'message' in err) {
@@ -495,7 +496,10 @@ export default function ClientsPage() {
 
   return (
     <Box>
-      <PageHeader title={labels.title} />
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <PageHeader title={labels.title} />
+        <ExportButtons endpoint="/clients/export" />
+      </Stack>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
         <TextField

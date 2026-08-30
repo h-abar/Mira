@@ -37,6 +37,7 @@ clientsRouter.get(
   validateQuery(clientSearchSchema),
   clientsController.list,
 );
+clientsRouter.get('/export', auth, requirePermission('clients.read'), clientsController.exportClients);
 clientsRouter.get('/:id', auth, requirePermission('clients.read'), clientsController.getById);
 clientsRouter.post(
   '/',

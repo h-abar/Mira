@@ -25,6 +25,7 @@ router.get('/client/:clientId', membershipsController.getClientMembership);
 router.use(requirePermission('memberships'));
 
 router.get('/plans', membershipsController.listPlans);
+router.get('/plans/export', membershipsController.exportPlans);
 router.post('/plans', validate(planCreateSchema), membershipsController.createPlan);
 router.put('/plans/:id', validate(planUpdateSchema), membershipsController.updatePlan);
 router.delete('/plans/:id', membershipsController.removePlan);

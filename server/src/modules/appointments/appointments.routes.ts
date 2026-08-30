@@ -7,6 +7,7 @@ const appointmentsRouter = Router();
 appointmentsRouter.use(auth);
 
 appointmentsRouter.get('/', requirePermission('appointments.read'), appointmentsController.list);
+appointmentsRouter.get('/export', requirePermission('appointments.read'), appointmentsController.exportAppointments);
 appointmentsRouter.get('/:id', requirePermission('appointments.read'), appointmentsController.getById);
 appointmentsRouter.post(
   '/',

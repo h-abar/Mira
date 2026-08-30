@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
+import { exportDataset, type ExportLang } from '../../utils/exportHelper';
 import {
   accountingService,
   type AppointmentInvoiceInput,
@@ -152,6 +153,98 @@ async function cancelInvoice(req: Request, res: Response, next: NextFunction): P
   }
 }
 
+async function exportInvoices(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const query = req.query as unknown as {
+      from?: Date;
+      to?: Date;
+      clientId?: number;
+      branchId?: number;
+      format?: string;
+      lang?: string;
+    };
+    const lang: ExportLang = query.lang === 'en' ? 'en' : 'ar';
+    const format = query.format === 'pdf' ? 'pdf' : 'excel';
+    const data = await accountingService.listInvoices({
+      from: query.from,
+      to: query.to,
+      clientId: query.clientId,
+      branchId: query.branchId,
+      limit: 1000,
+    });
+    const isAr = lang === 'ar';
+    const dataset = {
+      title: isAr ? 'الفواتير' : 'Invoices',
+      subtitle: isAr
+        ? `إجمالي: ${data.total} فاتورة`
+        : `Total: ${data.total} invoices`,
+      lang,
+      columns: isAr
+        ? ['#', 'التاريخ', 'العميل', 'الإجمالي', 'الخصم', 'الضريبة', 'النهاية', 'طريقة الدفع', 'الحالة']
+        : ['#', 'Date', 'Client', 'Total', 'Discount', 'Tax', 'Final', 'Payment', 'Status'],
+      rows: data.items.map((inv: any) => [
+        inv.id,
+        new Date(inv.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
+        inv.client?.name ?? '-',
+        Number(inv.totalAmount ?? 0),
+        Number(inv.discount ?? 0),
+        Number(inv.tax ?? 0),
+        Number(inv.finalAmount ?? 0),
+        inv.paymentMethod ?? '-',
+        inv.status ?? '-',
+      ]),
+    };
+    const result = await exportDataset(dataset, format);
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="invoices.${result.extension}"`);
+    res.send(result.buffer);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function exportExpenses(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const query = req.query as unknown as {
+      from?: Date;
+      to?: Date;
+      category?: string;
+      format?: string;
+      lang?: string;
+    };
+    const lang: ExportLang = query.lang === 'en' ? 'en' : 'ar';
+    const format = query.format === 'pdf' ? 'pdf' : 'excel';
+    const items = await accountingService.listExpenses({
+      from: query.from,
+      to: query.to,
+      category: query.category,
+    });
+    const isAr = lang === 'ar';
+    const dataset = {
+      title: isAr ? 'المصاريف' : 'Expenses',
+      subtitle: isAr ? `إجمالي: ${items.length} مصروف` : `Total: ${items.length} expenses`,
+      lang,
+      columns: isAr
+        ? ['#', 'التاريخ', 'الفئة', 'المبلغ', 'الوصف', 'بواسطة']
+        : ['#', 'Date', 'Category', 'Amount', 'Description', 'By'],
+      rows: items.map((exp: any) => [
+        exp.id,
+        new Date(exp.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
+        exp.category ?? '-',
+        Number(exp.amount ?? 0),
+        exp.description ?? '-',
+        exp.creator?.username ?? '-',
+      ]),
+    };
+    const result = await exportDataset(dataset, format);
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="expenses.${result.extension}"`);
+    res.send(result.buffer);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const accountingController = {
   createInvoice,
   listInvoices,
@@ -162,4 +255,6 @@ export const accountingController = {
   updateExpense,
   removeExpense,
   summary,
+  exportInvoices,
+  exportExpenses,
 };

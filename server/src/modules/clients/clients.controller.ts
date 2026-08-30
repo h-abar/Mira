@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { exportDataset, type ExportLang } from '../../utils/exportHelper';
 import { clientsService, type ClientListParams } from './clients.service';
 
 export const clientsController = {
@@ -42,6 +43,40 @@ export const clientsController = {
     try {
       const data = await clientsService.remove(Number(req.params.id));
       res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async exportClients(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const query = req.query as unknown as { format?: string; lang?: string };
+      const lang: ExportLang = query.lang === 'en' ? 'en' : 'ar';
+      const format = query.format === 'pdf' ? 'pdf' : 'excel';
+      const data = await clientsService.list({ limit: 1000 });
+      const isAr = lang === 'ar';
+      const dataset = {
+        title: isAr ? 'العملاء' : 'Clients',
+        subtitle: isAr ? `إجمالي: ${data.total} عميل` : `Total: ${data.total} clients`,
+        lang,
+        columns: isAr
+          ? ['#', 'الاسم', 'الهاتف', 'واتساب', 'البريد', 'إجمالي الإنفاق', 'النقاط', 'تاريخ الإنشاء']
+          : ['#', 'Name', 'Phone', 'WhatsApp', 'Email', 'Total Spent', 'Points', 'Created At'],
+        rows: data.items.map((client: any) => [
+          client.id,
+          client.name ?? '-',
+          client.phone ?? '-',
+          client.whatsapp ?? '-',
+          client.email ?? '-',
+          Number(client.totalSpent ?? 0),
+          Number(client.points ?? 0),
+          new Date(client.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
+        ]),
+      };
+      const result = await exportDataset(dataset, format);
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="clients.${result.extension}"`);
+      res.send(result.buffer);
     } catch (error) {
       next(error);
     }

@@ -1,4 +1,5 @@
 ﻿import { NextFunction, Request, Response } from 'express';
+import { exportDataset, type ExportLang } from '../../utils/exportHelper';
 import { membershipsService } from './memberships.service';
 import { getActiveMembership } from './membershipDiscount';
 import { ApiError } from '../../utils/ApiError';
@@ -109,6 +110,40 @@ async function getClientMembership(req: Request, res: Response, next: NextFuncti
   }
 }
 
+async function exportPlans(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = req.query as unknown as { format?: string; lang?: string };
+    const lang: ExportLang = query.lang === 'en' ? 'en' : 'ar';
+    const format = query.format === 'pdf' ? 'pdf' : 'excel';
+    const items = await membershipsService.listPlans();
+    const isAr = lang === 'ar';
+    const dataset = {
+      title: isAr ? 'باقات العضوية' : 'Membership Plans',
+      subtitle: isAr ? `إجمالي: ${items.length} باقة` : `Total: ${items.length} plans`,
+      lang,
+      columns: isAr
+        ? ['#', 'الاسم (عربي)', 'الاسم (إنجليزي)', 'السعر', 'مدة (أيام)', 'نسبة الخصم %', 'عدد الأعضاء', 'نشط']
+        : ['#', 'Name (Ar)', 'Name (En)', 'Price', 'Duration Days', 'Discount %', 'Members Count', 'Active'],
+      rows: items.map((plan: any) => [
+        plan.id,
+        plan.nameAr ?? '-',
+        plan.nameEn ?? '-',
+        Number(plan.price ?? 0),
+        Number(plan.durationDays ?? 0),
+        Number(plan.discountPercent ?? 0),
+        Number(plan.membersCount ?? 0),
+        plan.isActive ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No'),
+      ]),
+    };
+    const result = await exportDataset(dataset, format);
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="membership-plans.${result.extension}"`);
+    res.send(result.buffer);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export const membershipsController = {
   listPlans,
   createPlan,
@@ -118,4 +153,5 @@ export const membershipsController = {
   listMemberships,
   cancelMembership,
   getClientMembership,
+  exportPlans,
 };

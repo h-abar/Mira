@@ -75,6 +75,7 @@ import { listServices, type Service } from '../api/services';
 import { useAuthStore } from '../stores/authStore';
 import { toHijri } from '../utils/hijri';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const labels = {
   ar: {
@@ -1304,6 +1305,7 @@ export default function AppointmentsPage() {
       >
         <PageHeader title={L.pageTitle} gutterBottom={false} />
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+          <ExportButtons endpoint="/appointments/export" />
           <TextField
             size="small"
             placeholder={L.searchClients}

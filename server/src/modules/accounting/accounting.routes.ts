@@ -64,11 +64,13 @@ function validateExpenseList(req: Request, _res: Response, next: NextFunction): 
 accountingRouter.use(auth);
 
 accountingRouter.post('/invoices', invoiceCreate, validateInvoiceCreate, accountingController.createInvoice);
+accountingRouter.get('/invoices/export', accountRead, accountingController.exportInvoices);
 accountingRouter.get('/invoices', accountRead, validateInvoiceList, accountingController.listInvoices);
 accountingRouter.get('/invoices/:id', accountRead, accountingController.getInvoice);
 accountingRouter.post('/invoices/:id/cancel', accountWrite, accountingController.cancelInvoice);
 
 accountingRouter.post('/expenses', accountWrite, validateExpenseCreate, accountingController.createExpense);
+accountingRouter.get('/expenses/export', accountRead, accountingController.exportExpenses);
 accountingRouter.get('/expenses', accountRead, validateExpenseList, accountingController.listExpenses);
 accountingRouter.put('/expenses/:id', accountWrite, validateExpenseUpdate, accountingController.updateExpense);
 accountingRouter.delete('/expenses/:id', accountWrite, accountingController.removeExpense);

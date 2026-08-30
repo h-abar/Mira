@@ -30,6 +30,7 @@ function validateUpdate(req: Request, _res: Response, next: NextFunction): void 
 employeesRouter.use(auth);
 
 employeesRouter.get('/', readRoles, employeesController.list);
+employeesRouter.get('/export', readRoles, employeesController.exportEmployees);
 employeesRouter.get('/:id', readRoles, employeesController.getById);
 employeesRouter.post('/', writeRoles, validateCreate, employeesController.create);
 employeesRouter.put('/:id', writeRoles, validateUpdate, employeesController.update);

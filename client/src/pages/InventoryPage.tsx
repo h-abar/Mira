@@ -46,6 +46,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useBranchStore } from '../stores/branchStore';
 import { isArabicText, isLatinText } from '../utils/languageValidation';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const L = {
   ar: {
@@ -560,7 +561,10 @@ export default function InventoryPage() {
 
   return (
     <Box>
-      <PageHeader title={l.title} />
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <PageHeader title={l.title} />
+        <ExportButtons endpoint="/inventory/products/export" />
+      </Stack>
 
       <Tabs value={tab} onChange={(_e, newValue) => setTab(newValue)} sx={{ mb: 2 }}>
         <Tab label={l.products} />

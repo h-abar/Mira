@@ -35,6 +35,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PrintIcon from '@mui/icons-material/Print';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ExportButtons from '../components/ExportButtons';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -1072,11 +1073,16 @@ export default function AccountingPage() {
     <Box>
       <PageHeader title={L.title} />
 
-      <Tabs value={tab} onChange={(_event, value: number) => setTab(value)} sx={{ mb: 2 }}>
-        <Tab label={L.invoices} />
-        <Tab label={L.expenses} />
-        <Tab label={L.summary} />
-      </Tabs>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Tabs value={tab} onChange={(_event, value: number) => setTab(value)}>
+          <Tab label={L.invoices} />
+          <Tab label={L.expenses} />
+          <Tab label={L.summary} />
+        </Tabs>
+        <ExportButtons
+          endpoint={tab === 1 ? '/accounting/expenses/export' : '/accounting/invoices/export'}
+        />
+      </Stack>
 
       {tab === 0 && (
         <Box>

@@ -38,6 +38,7 @@ import { listProducts, type Product } from '../api/inventory';
 import type { ApiError } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const L = {
   ar: {
@@ -346,11 +347,14 @@ export default function PurchasesPage() {
       <PageHeader
         title={l.title}
         actions={
-          canWrite && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-              {l.add}
-            </Button>
-          )
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ExportButtons endpoint="/purchases/export" />
+            {canWrite && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+                {l.add}
+              </Button>
+            )}
+          </Stack>
         }
       />
 

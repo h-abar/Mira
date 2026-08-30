@@ -31,6 +31,7 @@ import {
 import type { ApiError } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const L = {
   ar: {
@@ -262,11 +263,14 @@ export default function SuppliersPage() {
       <PageHeader
         title={l.title}
         actions={
-          canWrite && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-              {l.add}
-            </Button>
-          )
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ExportButtons endpoint="/suppliers/export" />
+            {canWrite && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+                {l.add}
+              </Button>
+            )}
+          </Stack>
         }
       />
 

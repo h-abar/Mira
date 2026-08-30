@@ -33,6 +33,7 @@ purchasesRouter.use(auth);
 
 purchasesRouter.get('/', purchaseRead, validateQuery, purchasesController.listPurchases);
 purchasesRouter.post('/', purchaseWrite, validate(purchaseCreateSchema), purchasesController.createPurchase);
+purchasesRouter.get('/export', purchaseRead, purchasesController.exportPurchases);
 purchasesRouter.get('/:id', purchaseRead, purchasesController.getPurchase);
 purchasesRouter.post('/:id/receive', purchaseWrite, purchasesController.receivePurchase);
 purchasesRouter.post('/:id/cancel', purchaseWrite, purchasesController.cancelPurchase);

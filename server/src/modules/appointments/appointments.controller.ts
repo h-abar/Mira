@@ -1,4 +1,5 @@
 import { type NextFunction, type Request, type Response } from 'express';
+import { exportDataset, type ExportLang } from '../../utils/exportHelper';
 import { appointmentsService } from './appointments.service';
 import {
   appointmentCreateSchema,
@@ -91,6 +92,54 @@ export const appointmentsController = {
         typeof requestedLang === 'string' && requestedLang === 'en' ? 'en' : 'ar';
       const data = await appointmentsService.sendReminder(id, lang);
       res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async exportAppointments(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const query = req.query as unknown as {
+        date?: string;
+        employeeId?: number;
+        status?: string;
+        from?: string;
+        to?: string;
+        format?: string;
+        lang?: string;
+      };
+      const lang: ExportLang = query.lang === 'en' ? 'en' : 'ar';
+      const format = query.format === 'pdf' ? 'pdf' : 'excel';
+      const items = await appointmentsService.list({
+        date: query.date,
+        employeeId: query.employeeId,
+        status: query.status as any,
+        from: query.from,
+        to: query.to,
+      });
+      const isAr = lang === 'ar';
+      const dataset = {
+        title: isAr ? 'المواعيد' : 'Appointments',
+        subtitle: isAr ? `إجمالي: ${items.length} موعد` : `Total: ${items.length} appointments`,
+        lang,
+        columns: isAr
+          ? ['#', 'التاريخ', 'الوقت', 'العميل', 'الموظف', 'الخدمة', 'الحالة', 'المدة']
+          : ['#', 'Date', 'Time', 'Client', 'Employee', 'Service', 'Status', 'Duration'],
+        rows: items.map((appt: any) => [
+          appt.id,
+          new Date(appt.date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US'),
+          appt.startTime ?? '-',
+          appt.client?.name ?? '-',
+          isAr ? (appt.employee?.nameAr ?? '-') : (appt.employee?.nameEn ?? '-'),
+          isAr ? (appt.service?.nameAr ?? '-') : (appt.service?.nameEn ?? '-'),
+          appt.status ?? '-',
+          Number(appt.service?.durationMinutes ?? 0),
+        ]),
+      };
+      const result = await exportDataset(dataset, format);
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="appointments.${result.extension}"`);
+      res.send(result.buffer);
     } catch (err) {
       next(err);
     }

@@ -46,6 +46,7 @@ import type { ApiError } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { isArabicText, isLatinText } from '../utils/languageValidation';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 interface Labels {
   title: string;
@@ -596,11 +597,14 @@ export default function EmployeesPage() {
       <PageHeader
         title={L.title}
         actions={
-          isAdmin && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
-              {L.add}
-            </Button>
-          )
+          <Stack direction="row" spacing={1} alignItems="center">
+            <ExportButtons endpoint="/employees/export" />
+            {isAdmin && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+                {L.add}
+              </Button>
+            )}
+          </Stack>
         }
       />
 

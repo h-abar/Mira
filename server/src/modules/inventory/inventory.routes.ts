@@ -53,6 +53,12 @@ inventoryRouter.get(
   requirePermission('inventory.read'),
   inventoryController.listCategories,
 );
+inventoryRouter.get(
+  '/products/export',
+  auth,
+  requirePermission('inventory.read'),
+  inventoryController.exportProducts,
+);
 inventoryRouter.post(
   '/products/categories/rename',
   auth,

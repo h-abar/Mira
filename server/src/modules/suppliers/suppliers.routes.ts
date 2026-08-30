@@ -37,6 +37,7 @@ suppliersRouter.use(auth);
 
 suppliersRouter.get('/', supplierRead, validateQuery, suppliersController.listSuppliers);
 suppliersRouter.post('/', supplierWrite, validate(supplierCreateSchema), suppliersController.createSupplier);
+suppliersRouter.get('/export', supplierRead, suppliersController.exportSuppliers);
 suppliersRouter.put('/:id', supplierWrite, validate(supplierUpdateSchema), suppliersController.updateSupplier);
 suppliersRouter.delete('/:id', supplierWrite, suppliersController.removeSupplier);
 suppliersRouter.get('/:id', supplierRead, suppliersController.getSupplier);

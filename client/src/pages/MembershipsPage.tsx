@@ -46,6 +46,7 @@ import { useAuthStore } from '../stores/authStore';
 import { isArabicText, isLatinText } from '../utils/languageValidation';
 import { toHijri } from '../utils/hijri';
 import PageHeader from '../components/PageHeader';
+import ExportButtons from '../components/ExportButtons';
 
 const L = {
   ar: {
@@ -449,7 +450,10 @@ export default function MembershipsPage() {
 
   return (
     <Box>
-      <PageHeader title={l.title} />
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <PageHeader title={l.title} />
+        <ExportButtons endpoint="/memberships/plans/export" />
+      </Stack>
 
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
