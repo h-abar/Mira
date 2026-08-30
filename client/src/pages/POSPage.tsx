@@ -450,7 +450,8 @@ export default function POSPage() {
   const total = Math.max(subtotal - discountNum + taxNum + tipNum, 0);
 
   const allItemsHaveEmployee = cart.every((c) => c.employeeId !== '');
-  const canComplete = Boolean(selectedClient && cart.length > 0 && allItemsHaveEmployee);
+  const hasAnyEmployee = employeeId !== '' || allItemsHaveEmployee || cart.some((c) => c.employeeId !== '');
+  const canComplete = Boolean(selectedClient && cart.length > 0 && hasAnyEmployee);
 
   // ---- Loyalty ----
   const clientPoints = selectedClient?.loyaltyPoints ?? 0;
@@ -552,7 +553,7 @@ export default function POSPage() {
         items: cart.map((item) => ({
           serviceId: item.kind === 'service' ? item.id : undefined,
           productId: item.kind === 'product' ? item.id : undefined,
-          employeeId: item.employeeId !== '' ? Number(item.employeeId) : undefined,
+          employeeId: item.employeeId !== '' ? Number(item.employeeId) : Number(effectiveEmployeeId),
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         })),

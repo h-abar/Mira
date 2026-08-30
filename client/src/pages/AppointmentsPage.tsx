@@ -487,7 +487,7 @@ function AppointmentDialog({
       <DialogTitle sx={{ fontWeight: 700 }}>
         {mode === 'create' ? L.newAppointment : L.edit}
       </DialogTitle>
-      <DialogContent dividers sx={{ maxHeight: isMobile ? 'none' : '72vh', overflowY: 'auto' }}>
+      <DialogContent dividers sx={{ overflowY: isMobile ? 'auto' : 'auto', maxHeight: isMobile ? 'none' : '72vh' }}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
 
@@ -1373,12 +1373,12 @@ export default function AppointmentsPage() {
         </Stack>
       </Stack>
 
-      <Box sx={{ overflowX: 'auto', mb: 3 }}>
+      <Box sx={{ mb: 3 }}>
         <Stack
           direction="row"
           spacing={1}
           alignItems="center"
-          sx={{ width: 'max-content', margin: '0 auto', py: 0.5 }}
+          sx={{ flexWrap: 'wrap', gap: 0.5, py: 0.5 }}
         >
           <IconButton
             aria-label={t('calendar.previousWeek')}
@@ -1467,13 +1467,13 @@ export default function AppointmentsPage() {
           <Typography variant="caption" color="text.secondary" sx={{ px: 2, pt: 1, display: 'block' }}>
             {canManage ? L.dragHint : ''}
           </Typography>
-          <Box sx={{ overflowX: 'auto' }}>
-            <Box sx={{ width: 'max-content', minWidth: '100%' }}>
+          <Box sx={{ overflowX: isMobile ? 'auto' : 'hidden' }}>
+            <Box sx={{ width: isMobile ? 'max-content' : '100%', minWidth: '100%' }}>
               {/* Header row: employee columns */}
               <Box sx={{ display: 'flex', borderBottom: 1, borderColor: 'divider' }}>
                 <Box
                   sx={{
-                    width: 64,
+                    width: isMobile ? 50 : 64,
                     flexShrink: 0,
                     p: 1,
                     fontSize: 12,
@@ -1488,14 +1488,17 @@ export default function AppointmentsPage() {
                     <Box
                       key={emp.id}
                       sx={{
-                        width: 180,
+                        width: isMobile ? 120 : 180,
                         flexShrink: 0,
                         p: 1,
                         textAlign: 'center',
                         fontWeight: 700,
-                        fontSize: 13,
+                        fontSize: isMobile ? 11 : 13,
                         borderInlineStart: 1,
                         borderColor: 'divider',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {nameOf(emp)}
@@ -1506,7 +1509,7 @@ export default function AppointmentsPage() {
               {/* Time grid */}
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Time axis */}
-                <Box sx={{ width: 64, flexShrink: 0 }}>
+                <Box sx={{ width: isMobile ? 50 : 64, flexShrink: 0 }}>
                   {Array.from({ length: 16 }, (_, i) => 8 + i).map((hour) => (
                     <Box
                       key={hour}
@@ -1536,7 +1539,7 @@ export default function AppointmentsPage() {
                       <Box
                         key={emp.id}
                         sx={{
-                          width: 180,
+                          width: isMobile ? 120 : 180,
                           flexShrink: 0,
                           position: 'relative',
                           borderInlineStart: 1,

@@ -1,5 +1,5 @@
 // Cache version — bump this string whenever you deploy to force all clients to get fresh code.
-const CACHE_NAME = 'mira-v5';
+const CACHE_NAME = 'mira-v6';
 const APP_SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -22,6 +22,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
+  // Only handle same-origin, non-API GET requests; let everything else pass through.
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
   // Navigation requests: always try network first so users always get the latest HTML.
@@ -34,21 +35,27 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
           return response;
         })
-        .catch(() => caches.match('/').then((cached) => cached ?? Response.error())),
+        .catch(() =>
+          caches.match('/').then((cached) => cached ?? caches.match('/index.html')),
+        ),
     );
     return;
   }
 
-  // Static assets (JS/CSS/images): network-first with cache fallback.
+  // Static assets (JS/CSS/images): stale-while-revalidate — serve from cache immediately
+  // and update in the background. Avoid Response.error() which causes network error logs.
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response && response.status === 200 && response.type === 'basic') {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request).then((cached) => cached ?? Response.error())),
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || networkFetch;
+    }),
   );
 });

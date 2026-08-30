@@ -32,6 +32,15 @@ import {
   type EmployeeInput,
   type EmployeeRole,
 } from '../api/employees';
+import {
+  listUsers,
+  createUser,
+  updateUser,
+  getPermissionDefs,
+  type UserAccount,
+  type PermissionDef,
+  type UserRole,
+} from '../api/users';
 import type { ApiError } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { isArabicText, isLatinText } from '../utils/languageValidation';
@@ -74,6 +83,18 @@ interface Labels {
   morningEnd: string;
   eveningStart: string;
   eveningEnd: string;
+  userAccount: string;
+  username: string;
+  password: string;
+  userRole: string;
+  permissions: string;
+  noUserAccount: string;
+  createUserAccount: string;
+  editUserAccount: string;
+  activateUser: string;
+  saveUser: string;
+  userSaved: string;
+  selectPermissions: string;
 }
 
 const enLabels: Labels = {
@@ -113,6 +134,18 @@ const enLabels: Labels = {
   morningEnd: 'Morning End',
   eveningStart: 'Evening Start',
   eveningEnd: 'Evening End',
+  userAccount: 'User Account',
+  username: 'Username',
+  password: 'Password',
+  userRole: 'System Role',
+  permissions: 'Permissions',
+  noUserAccount: 'No user account linked',
+  createUserAccount: 'Create User Account',
+  editUserAccount: 'Edit User Account',
+  activateUser: 'Active',
+  saveUser: 'Save User',
+  userSaved: 'User account saved successfully',
+  selectPermissions: 'Select permissions',
 };
 
 const arLabels: Labels = {
@@ -152,6 +185,18 @@ const arLabels: Labels = {
   morningEnd: 'نهاية الدوام الصباحي',
   eveningStart: 'بداية الدوام المسائي',
   eveningEnd: 'نهاية الدوام المسائي',
+  userAccount: 'حساب المستخدم',
+  username: 'اسم المستخدم',
+  password: 'كلمة المرور',
+  userRole: 'الدور في النظام',
+  permissions: 'الصلاحيات',
+  noUserAccount: 'لا يوجد حساب مستخدم مرتبط',
+  createUserAccount: 'إنشاء حساب مستخدم',
+  editUserAccount: 'تعديل حساب المستخدم',
+  activateUser: 'نشط',
+  saveUser: 'حفظ المستخدم',
+  userSaved: 'تم حفظ حساب المستخدم بنجاح',
+  selectPermissions: 'اختر الصلاحيات',
 };
 
 const roleLabelsEn: Record<EmployeeRole, string> = {
@@ -203,6 +248,7 @@ export default function EmployeesPage() {
   const roleLabels = lang === 'ar' ? roleLabelsAr : roleLabelsEn;
 
   const isAdmin = useAuthStore((s) => s.hasPermission('employees.write'));
+  const canViewCost = useAuthStore((s) => s.hasPermission('cost.view'));
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,6 +260,21 @@ export default function EmployeesPage() {
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>(
     { open: false, message: '', severity: 'success' },
   );
+
+  // User account management state
+  const [allUsers, setAllUsers] = useState<UserAccount[]>([]);
+  const [permissionDefs, setPermissionDefs] = useState<PermissionDef[]>([]);
+  const [linkedUser, setLinkedUser] = useState<UserAccount | null>(null);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [userForm, setUserForm] = useState({
+    username: '',
+    password: '',
+    role: 'STYLIST' as UserRole,
+    permissions: [] as string[],
+    isActive: true,
+  });
+  const [savingUser, setSavingUser] = useState(false);
+  const canManageUsers = useAuthStore((s) => s.hasPermission('users'));
 
   const showSnackbar = useCallback((message: string, severity: 'success' | 'error' = 'success') => {
     setSnack({ open: true, message, severity });
@@ -230,9 +291,20 @@ export default function EmployeesPage() {
     }
   }, [showSnackbar]);
 
+  const loadUsersAndPerms = useCallback(async () => {
+    try {
+      const [users, perms] = await Promise.all([listUsers(), getPermissionDefs()]);
+      setAllUsers(users);
+      setPermissionDefs(perms);
+    } catch {
+      // ignore — user management is optional
+    }
+  }, []);
+
   useEffect(() => {
     void loadEmployees();
-  }, [loadEmployees]);
+    if (canManageUsers) void loadUsersAndPerms();
+  }, [loadEmployees, loadUsersAndPerms, canManageUsers]);
 
   const nameOf = (employee: { nameAr: string; nameEn: string }): string =>
     lang === 'ar' ? employee.nameAr : employee.nameEn;
@@ -273,7 +345,70 @@ export default function EmployeesPage() {
       eveningEnd: employee.eveningEnd || '21:00',
       workDays: employee.workDays || 'Sun,Mon,Tue,Wed,Thu',
     });
+    // Find linked user account
+    const user = allUsers.find((u) => u.employeeId === employee.id) ?? null;
+    setLinkedUser(user);
     setDialogOpen(true);
+  };
+
+  const openUserDialog = () => {
+    if (linkedUser) {
+      setUserForm({
+        username: linkedUser.username,
+        password: '',
+        role: linkedUser.role,
+        permissions: linkedUser.permissions,
+        isActive: linkedUser.isActive,
+      });
+    } else {
+      const suggestedName = (form.nameEn || form.nameAr || 'user').toLowerCase().replace(/\s+/g, '');
+      setUserForm({
+        username: suggestedName,
+        password: '',
+        role: 'STYLIST',
+        permissions: ['shifts.read', 'shifts.write'],
+        isActive: true,
+      });
+    }
+    setUserDialogOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    if (!editing || !userForm.username.trim()) return;
+    setSavingUser(true);
+    try {
+      if (linkedUser) {
+        await updateUser(linkedUser.id, {
+          username: userForm.username.trim(),
+          password: userForm.password || undefined,
+          role: userForm.role,
+          permissions: userForm.permissions,
+          isActive: userForm.isActive,
+        });
+      } else {
+        if (!userForm.password) {
+          showSnackbar(lang === 'ar' ? 'كلمة المرور مطلوبة لحساب جديد' : 'Password required for new account', 'error');
+          setSavingUser(false);
+          return;
+        }
+        const created = await createUser({
+          username: userForm.username.trim(),
+          password: userForm.password,
+          role: userForm.role,
+          employeeId: editing.id,
+          permissions: userForm.permissions,
+          isActive: userForm.isActive,
+        });
+        setLinkedUser(created);
+      }
+      showSnackbar(L.userSaved, 'success');
+      setUserDialogOpen(false);
+      await loadUsersAndPerms();
+    } catch (err) {
+      showSnackbar((err as ApiError).message, 'error');
+    } finally {
+      setSavingUser(false);
+    }
   };
 
   const handleToggleActive = async (employee: Employee) => {
@@ -405,12 +540,16 @@ export default function EmployeesPage() {
         );
       },
     },
-    {
-      field: 'commissionRate',
-      headerName: L.commissionRate,
-      width: 120,
-      valueGetter: (_value, row) => `${Number(row.commissionRate)}%`,
-    },
+    ...(canViewCost
+      ? [
+          {
+            field: 'commissionRate' as const,
+            headerName: L.commissionRate,
+            width: 120,
+            valueGetter: (_value: unknown, row: Employee) => `${Number(row.commissionRate)}%`,
+          },
+        ]
+      : []),
     { field: 'hireDate', headerName: L.hireDate, width: 120, valueGetter: (_value, row) => formatDate(row.hireDate) },
     {
       field: 'appointments',
@@ -528,14 +667,16 @@ export default function EmployeesPage() {
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              label={L.commissionRate}
-              type="number"
-              inputProps={{ min: 0, max: 100, step: '0.01' }}
-              value={form.commissionRate}
-              onChange={(e) => setForm((f) => ({ ...f, commissionRate: e.target.value }))}
-              fullWidth
-            />
+            {canViewCost && (
+              <TextField
+                label={L.commissionRate}
+                type="number"
+                inputProps={{ min: 0, max: 100, step: '0.01' }}
+                value={form.commissionRate}
+                onChange={(e) => setForm((f) => ({ ...f, commissionRate: e.target.value }))}
+                fullWidth
+              />
+            )}
             <DatePicker
               label={L.hireDate}
               value={form.hireDate}
@@ -628,6 +769,47 @@ export default function EmployeesPage() {
               />
             )}
           </Stack>
+
+          {/* User account & permissions management */}
+          {canManageUsers && editing && (
+            <Box sx={{ mt: 3, p: 2, borderRadius: 2, border: 1, borderColor: 'divider' }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {L.userAccount}
+                </Typography>
+                <Button size="small" variant="outlined" onClick={openUserDialog}>
+                  {linkedUser ? L.editUserAccount : L.createUserAccount}
+                </Button>
+              </Stack>
+              {linkedUser ? (
+                <Stack spacing={0.5}>
+                  <Typography variant="body2">
+                    <strong>{L.username}:</strong> {linkedUser.username}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{L.userRole}:</strong> {linkedUser.role}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{L.permissions}:</strong>{' '}
+                    {linkedUser.permissions.length > 0
+                      ? linkedUser.permissions.map((p) => {
+                          const def = permissionDefs.find((d) => d.key === p);
+                          return lang === 'ar' ? def?.ar ?? p : def?.en ?? p;
+                        }).join('، ')
+                      : (lang === 'ar' ? 'لا توجد' : 'None')}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>{L.activateUser}:</strong>{' '}
+                    <Chip size="small" color={linkedUser.isActive ? 'success' : 'default'} label={linkedUser.isActive ? (lang === 'ar' ? 'نشط' : 'Active') : (lang === 'ar' ? 'معطل' : 'Inactive')} />
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {L.noUserAccount}
+                </Typography>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>{L.cancel}</Button>
@@ -638,6 +820,91 @@ export default function EmployeesPage() {
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {L.save}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* User account management dialog */}
+      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{linkedUser ? L.editUserAccount : L.createUserAccount}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label={L.username}
+              value={userForm.username}
+              onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
+              fullWidth
+              required
+            />
+            <TextField
+              label={linkedUser ? `${L.password} (${lang === 'ar' ? 'اتركه فارغ للإبقاء' : 'leave blank to keep'})` : L.password}
+              type="password"
+              value={userForm.password}
+              onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+              fullWidth
+              required={!linkedUser}
+            />
+            <TextField
+              select
+              label={L.userRole}
+              value={userForm.role}
+              onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as UserRole }))}
+              fullWidth
+            >
+              <MenuItem value="ADMIN">{lang === 'ar' ? 'مدير' : 'Admin'}</MenuItem>
+              <MenuItem value="RECEPTIONIST">{lang === 'ar' ? 'استقبال' : 'Receptionist'}</MenuItem>
+              <MenuItem value="STYLIST">{lang === 'ar' ? 'كوافيرة' : 'Stylist'}</MenuItem>
+            </TextField>
+            <Box>
+              <Typography variant="subtitle2" mb={1}>{L.selectPermissions}</Typography>
+              <Stack spacing={0.5} sx={{ maxHeight: 250, overflowY: 'auto' }}>
+                {permissionDefs.map((perm) => {
+                  const checked = userForm.permissions.includes(perm.key);
+                  return (
+                    <Stack
+                      key={perm.key}
+                      direction="row"
+                      alignItems="center"
+                      onClick={() =>
+                        setUserForm((f) => ({
+                          ...f,
+                          permissions: checked
+                            ? f.permissions.filter((p) => p !== perm.key)
+                            : [...f.permissions, perm.key],
+                        }))
+                      }
+                      sx={{ cursor: 'pointer', py: 0.25 }}
+                    >
+                      <Switch size="small" checked={checked} />
+                      <Typography variant="body2">
+                        {lang === 'ar' ? perm.ar : perm.en}
+                        <Typography component="span" variant="caption" color="text.secondary" sx={{ mx: 1 }}>
+                          ({perm.key})
+                        </Typography>
+                      </Typography>
+                    </Stack>
+                  );
+                })}
+              </Stack>
+            </Box>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Switch
+                checked={userForm.isActive}
+                onChange={(e) => setUserForm((f) => ({ ...f, isActive: e.target.checked }))}
+              />
+              <Typography variant="body2">{L.activateUser}</Typography>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUserDialogOpen(false)}>{L.cancel}</Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveUser}
+            disabled={savingUser}
+            startIcon={savingUser ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {L.saveUser}
           </Button>
         </DialogActions>
       </Dialog>

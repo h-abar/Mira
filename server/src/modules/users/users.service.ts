@@ -40,6 +40,7 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { key: 'users', ar: 'إدارة المستخدمين', en: 'Manage users' },
   { key: 'settings', ar: 'الإعدادات', en: 'Settings' },
   { key: 'backup', ar: 'النسخ الاحتياطي', en: 'Backup' },
+  { key: 'cost.view', ar: 'عرض التكاليف والعمولات', en: 'View costs & commissions' },
 ];
 
 const userSelect = {
