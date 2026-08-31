@@ -50,6 +50,11 @@ import PageHeader from '../components/PageHeader';
 
 const LOYALTY_KEYS = ['LOYALTY_POINTS_PER_CURRENCY', 'LOYALTY_POINT_VALUE'] as const;
 const PAYMENT_KEYS = ['PAYMENT_GATEWAY', 'PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY', 'PAYMENT_MERCHANT_ID', 'PAYMENT_WEBHOOK_URL', 'PAYMENT_CURRENCY'] as const;
+
+const PAYMENT_GATEWAY_OPTIONS = [
+  { value: 'moyasar', labelAr: 'ميسر (Moyasar)', labelEn: 'Moyasar' },
+  { value: 'simulated', labelAr: 'محاكاة (بدون بوابة)', labelEn: 'Simulated (no gateway)' },
+] as const;
 const WHATSAPP_SAVE_KEYS = ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID', 'WHATSAPP_ENABLED', 'WHATSAPP_BUSINESS_ACCOUNT_ID', 'WHATSAPP_WEBHOOK_SECRET', 'WHATSAPP_PUBLIC_PHONE'] as const;
 const SOCIAL_KEYS = ['SOCIAL_INSTAGRAM', 'SOCIAL_FACEBOOK', 'SOCIAL_WHATSAPP', 'SOCIAL_SNAPCHAT', 'SOCIAL_TIKTOK'] as const;
 
@@ -154,9 +159,12 @@ const L = {
     qrModeTitle: 'نوع عرض رمز QR', qrModeSquare: 'QR مربع (صورة)', qrModeText: 'نص قديم (Base64)',
     paymentsTitle: 'المدفوعات الإلكترونية',
     paymentsNote: 'تُستخدم إعدادات الدفع عند إتمام العمليات. احتفظ بمفاتيحك سرية.',
-    paymentMethod: 'طريقة الدفع', paymentApiKey: 'مفتاح API', paymentPublicKey: 'المفتاح العام',
+    paymentGateway: 'بوابة الدفع', paymentMethod: 'طريقة الدفع', paymentApiKey: 'مفتاح API', paymentPublicKey: 'المفتاح العام',
+    paymentMerchantId: 'معرف التاجر', paymentWebhook: 'رابط Webhook', paymentCurrency: 'العملة',
+    paymentApiNote: 'ستجد هذه المفاتيح في لوحة تحكم بوابة الدفع.',
     whatsappTitle: 'واتساب', whatsappToken: 'رمز الوصول (Token)',
     whatsappPhoneId: 'معرّف الهاتف (Phone ID)', whatsappEnabled: 'تفعيل واتساب',
+    whatsappBizAccount: 'معرف حساب الأعمال', whatsappWebhookSecret: 'مفتاح Webhook السري', whatsappPublicPhone: 'رقم واتساب العام',
     whatsappTest: 'اختبار', whatsappTestPhone: 'رقم الهاتف للاختبار',
     whatsappTestRunning: 'جارٍ الإرسال...', whatsappTestSimulated: 'تم الإرسال بنجاح (وضع المحاكاة)',
     whatsappTestReal: 'تم إرسال رسالة الاختبار بنجاح', whatsappTestFailed: 'فشل إرسال رسالة الاختبار',
