@@ -164,11 +164,6 @@ export const SETTINGS_DEFINITIONS = {
     labelAr: 'رابط استقبال إشعارات الدفع (Webhook URL)',
     labelEn: 'Payment Webhook URL',
   },
-  PAYMENT_GATEWAY: {
-    defaultValue: 'moyasar',
-    labelAr: 'بوابة الدفع الإلكتروني',
-    labelEn: 'Payment Gateway',
-  },
   PAYMENT_GATEWAY_ENV: {
     defaultValue: 'sandbox',
     labelAr: 'بيئة بوابة الدفع (sandbox/production)',

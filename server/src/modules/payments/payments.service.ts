@@ -2,6 +2,16 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { ApiError } from '../../utils/ApiError';
+import { sendWhatsApp } from '../notifications/notifications.service';
+import { MoyasarGateway } from './gateways/moyasarGateway';
+
+interface PaymentGateway {
+  createCharge(input: {
+    amount: number;
+    currency: string;
+    method: string;
+  }): Promise<{ transactionId: string }>;
+}
 
 const PAYMENT_CONFIG_KEYS = ['PAYMENT_METHOD', 'PAYMENT_API_KEY', 'PAYMENT_PUBLIC_KEY', 'PAYMENT_GATEWAY', 'PAYMENT_GATEWAY_ENV'] as const;
 
@@ -69,10 +79,13 @@ async function createPayment(input: PaymentCreateInput) {
     }
   }
 
-  // Choose gateway based on config
-  let gatewayInstance: any = null;
-  if (config.gateway && config.gateway === 'moyasar') {
-    gatewayInstance = new MoyasarGateway({ apiKey: config.apiKey, publicKey: config.publicKey, env: config.gatewayEnv ?? 'sandbox' });
+  let gatewayInstance: PaymentGateway | null = null;
+  if (config.gateway === 'moyasar') {
+    gatewayInstance = new MoyasarGateway({
+      apiKey: config.apiKey ?? '',
+      publicKey: config.publicKey ?? '',
+      env: config.gatewayEnv ?? 'sandbox',
+    });
   }
   // Additional gateways can be added here (e.g., Stripe)
 
@@ -114,19 +127,21 @@ async function createPayment(input: PaymentCreateInput) {
     }
   }
 
-  // Send WhatsApp notification if configured
   try {
-    const whatsappConfig = await settingsService.getAll();
-    const tokenItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_TOKEN');
-    const phoneIdItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_PHONE_ID');
-    if (tokenItem && phoneIdItem && tokenItem.value !== '••••••••' && phoneIdItem.value !== '••••••••') {
-      const messageTemplateItem = whatsappConfig.items.find(i => i.key === 'WHATSAPP_MESSAGE_TEMPLATE');
-      const template = messageTemplateItem?.value || 'تم دفع الفاتورة بنجاح. رقم العملية: {{transactionId}}';
+    const phone = await resolveClientPhone(paid.invoiceId, paid.appointmentId);
+    if (phone) {
+      const templateRow = await prisma.setting.findUnique({
+        where: { key: 'WHATSAPP_MESSAGE_TEMPLATE' },
+      });
+      const template =
+        templateRow?.value || 'تم دفع الفاتورة بنجاح. رقم العملية: {{transactionId}}';
       const message = template.replace('{{transactionId}}', paid.transactionId ?? '');
-      await sendWhatsAppMessage(tokenItem.value, phoneIdItem.value, message);
+      await sendWhatsApp(phone, message, {
+        type: 'payment',
+        referenceId: String(paid.id),
+      });
     }
   } catch (e) {
-    // Log but do not fail payment
     console.error('Failed to send WhatsApp notification', e);
   }
 
@@ -182,6 +197,27 @@ async function refundPayment(id: number) {
     where: { id },
     data: { status: 'REFUNDED' },
   });
+}
+
+async function resolveClientPhone(
+  invoiceId: number | null,
+  appointmentId: number | null,
+): Promise<string | null> {
+  if (invoiceId) {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      select: { client: { select: { whatsapp: true, phone: true } } },
+    });
+    return invoice?.client.whatsapp || invoice?.client.phone || null;
+  }
+  if (appointmentId) {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { client: { select: { whatsapp: true, phone: true } } },
+    });
+    return appointment?.client.whatsapp || appointment?.client.phone || null;
+  }
+  return null;
 }
 
 export const paymentsService = {
