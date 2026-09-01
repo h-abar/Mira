@@ -73,8 +73,10 @@ Note: make sure `server/.env` exists before running (copy from `.env.example`).
 
 ## بيانات الدخول الافتراضية
 - اسم المستخدم: `admin`
-- كلمة المرور: `admin123`
-(يمكن تغييرهما بعد تسجيل الدخول أو في `server/prisma/seed.ts`)
+- كلمة المرور: `admin1234`
+- **إنتاج:** https://mira-production-296a.up.railway.app/login
+- **ملف Excel:** `docs/بيانات-الدخول.xlsx` (بيانات الدخول + روابط سريعة)
+- (يمكن تغييرهما بعد تسجيل الدخول أو في `server/prisma/seed.ts`)
 
 ## متغيرات البيئة
 انسخ `.env.example` (في جذر المشروع) إلى `server/.env` وعدّل القيم. تشمل: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT`, `CORS_ORIGIN`, `NODE_ENV`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `PG_*`, `BACKUP_*`, `REMINDER_*`, `ZATCA_*`.
