@@ -16,6 +16,11 @@ export interface AssignInput {
   planId: number;
 }
 
+export interface MembershipListFilters {
+  planId?: number;
+  status?: string;
+}
+
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
@@ -82,12 +87,20 @@ async function assign(data: AssignInput) {
     throw new ApiError(404, 'Membership plan not found.');
   }
 
+  if (!plan.isActive) {
+    throw new ApiError(400, 'الباقة غير نشطة.');
+  }
+
   const now = new Date();
   const active = await prisma.clientMembership.findFirst({
-    where: { clientId: data.clientId, status: 'ACTIVE' },
+    where: {
+      clientId: data.clientId,
+      status: 'ACTIVE',
+      endDate: { gte: now },
+    },
   });
   if (active) {
-    throw new ApiError(400, 'Client already has an active membership.');
+    throw new ApiError(400, 'العميلة لديها عضوية نشطة بالفعل. ألغِ العضوية الحالية أو انتظر انتهاءها.');
   }
 
   return prisma.clientMembership.create({
@@ -102,8 +115,17 @@ async function assign(data: AssignInput) {
   });
 }
 
-async function listMemberships() {
+async function listMemberships(filters: MembershipListFilters = {}) {
+  const where: Prisma.ClientMembershipWhereInput = {};
+  if (filters.planId !== undefined && Number.isInteger(filters.planId)) {
+    where.planId = filters.planId;
+  }
+  if (filters.status) {
+    where.status = filters.status as Prisma.EnumMembershipStatusFilter['equals'];
+  }
+
   const memberships = await prisma.clientMembership.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     include: { client: true, plan: true },
   });

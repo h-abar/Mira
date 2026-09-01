@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery, useTheme } from '@mui/material';
 import {
@@ -24,10 +24,15 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select, { type SelectChangeEvent } from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Autocomplete from '@mui/material/Autocomplete';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CardMembershipIcon from '@mui/icons-material/CardMembership';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import {
   listPlans,
   createPlan,
@@ -60,7 +65,10 @@ const L = {
     price: 'السعر',
     durationDays: 'المدة (أيام)',
     discountPercent: 'نسبة الخصم %',
-    services: 'الخدمات المشمولة',
+    services: 'الخدمات المشمولة (اختياري)',
+    servicesOptionalHint: 'اترك فارغاً لتطبيق الخصم على جميع الخدمات. اختر خدمات محددة لربط الباقة بها فقط.',
+    allServices: 'كل الخدمات',
+    servicesLinked: 'خدمات مرتبطة',
     save: 'حفظ',
     cancel: 'إلغاء',
     delete: 'حذف',
@@ -73,6 +81,7 @@ const L = {
     assigned: 'تم تعيين العضوية للعميلة',
     cancelled: 'تم إلغاء العضوية',
     assign: 'تعيين عضوية',
+    assignToClient: 'تعيين لعميلة',
     assignTitle: 'تعيين عضوية لعميلة',
     client: 'العميلة',
     plan: 'الباقة',
@@ -89,6 +98,16 @@ const L = {
     required: 'هذا الحقل مطلوب',
     nameArError: 'يجب أن يُكتب الاسم بالحروف العربية فقط',
     nameEnError: 'يجب أن يُكتب الاسم بالحروف الإنجليزية فقط',
+    planPreview: 'معاينة الباقة',
+    activeMembershipWarning: 'هذه العميلة لديها عضوية نشطة — ألغِها أولاً أو انتظر انتهاءها',
+    hasActiveMembership: 'عضوية نشطة',
+    filterByPlan: 'فلترة حسب الباقة',
+    allPlans: 'كل الباقات',
+    viewMembers: 'عرض العضويات',
+    searchClientHint: 'ابحث بالاسم أو الجوال',
+    days: 'يوم',
+    inactive: 'غير نشطة',
+    selectActivePlan: 'اختر باقة نشطة',
   },
   en: {
     title: 'Memberships & Plans',
@@ -101,7 +120,10 @@ const L = {
     price: 'Price',
     durationDays: 'Duration (days)',
     discountPercent: 'Discount %',
-    services: 'Included Services',
+    services: 'Included Services (optional)',
+    servicesOptionalHint: 'Leave empty to apply discount to all services. Select specific services to link the plan to them only.',
+    allServices: 'All services',
+    servicesLinked: 'Linked services',
     save: 'Save',
     cancel: 'Cancel',
     delete: 'Delete',
@@ -114,6 +136,7 @@ const L = {
     assigned: 'Membership assigned',
     cancelled: 'Membership cancelled',
     assign: 'Assign Membership',
+    assignToClient: 'Assign to client',
     assignTitle: 'Assign Membership to Client',
     client: 'Client',
     plan: 'Plan',
@@ -130,6 +153,16 @@ const L = {
     required: 'This field is required',
     nameArError: 'Name must be written in Arabic letters only',
     nameEnError: 'Name must be written in English letters only',
+    planPreview: 'Plan preview',
+    activeMembershipWarning: 'This client already has an active membership — cancel it first or wait until it expires',
+    hasActiveMembership: 'Active membership',
+    filterByPlan: 'Filter by plan',
+    allPlans: 'All plans',
+    viewMembers: 'View memberships',
+    searchClientHint: 'Search by name or phone',
+    days: 'days',
+    inactive: 'Inactive',
+    selectActivePlan: 'Select an active plan',
   },
 } as const;
 
@@ -178,6 +211,7 @@ export default function MembershipsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
+  const [planFilter, setPlanFilter] = useState<number | ''>('');
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -191,16 +225,43 @@ export default function MembershipsPage() {
   const [planForm, setPlanForm] = useState<PlanForm>(emptyPlanForm());
   const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
   const [assignDialog, setAssignDialog] = useState(false);
-  const [assignForm, setAssignForm] = useState({ clientId: '', planId: '' });
+  const [assignClient, setAssignClient] = useState<Client | null>(null);
+  const [assignPlanId, setAssignPlanId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<MembershipPlan | null>(null);
 
   const nameOf = (plan?: { nameAr: string; nameEn: string } | null): string =>
     plan ? (lang === 'ar' ? plan.nameAr : plan.nameEn) : '-';
 
-  const load = async () => {
+  const serviceName = useCallback(
+    (id: number): string => {
+      const svc = services.find((s) => s.id === id);
+      return svc ? (lang === 'ar' ? svc.nameAr : svc.nameEn) : String(id);
+    },
+    [services, lang],
+  );
+
+  const activeClientIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const m of memberships) {
+      if (m.status === 'ACTIVE' && (m.remainingDays ?? 0) >= 0) {
+        ids.add(m.clientId);
+      }
+    }
+    return ids;
+  }, [memberships]);
+
+  const selectedAssignPlan = useMemo(
+    () => (assignPlanId ? plans.find((p) => p.id === Number(assignPlanId)) ?? null : null),
+    [assignPlanId, plans],
+  );
+
+  const load = async (membershipFilters?: { planId?: number }) => {
     setLoading(true);
     try {
-      const [p, m] = await Promise.all([listPlans(), listMemberships()]);
+      const [p, m] = await Promise.all([
+        listPlans(),
+        listMemberships(membershipFilters?.planId ? { planId: membershipFilters.planId } : undefined),
+      ]);
       setPlans(p);
       setMemberships(m);
     } catch (err) {
@@ -212,11 +273,12 @@ export default function MembershipsPage() {
 
   useEffect(() => {
     void load();
+    void loadServices();
   }, []);
 
   const loadClients = async () => {
     try {
-      const res = await listClients({ limit: 100 });
+      const res = await listClients({ limit: 500 });
       setClients(res.items);
     } catch {
       /* ignore */
@@ -281,7 +343,7 @@ export default function MembershipsPage() {
         setSnack({ open: true, message: l.created, severity: 'success' });
       }
       setPlanDialog({ open: false, editing: null });
-      await load();
+      await load(planFilter !== '' ? { planId: planFilter } : undefined);
     } catch (err) {
       setSnack({ open: true, message: getErrorMessage(err), severity: 'error' });
     }
@@ -293,25 +355,30 @@ export default function MembershipsPage() {
       await deletePlan(deleteTarget.id);
       setSnack({ open: true, message: l.deleted, severity: 'success' });
       setDeleteTarget(null);
-      await load();
+      await load(planFilter !== '' ? { planId: planFilter } : undefined);
     } catch (err) {
       setSnack({ open: true, message: getErrorMessage(err), severity: 'error' });
     }
   };
 
-  const openAssign = async () => {
-    setAssignForm({ clientId: '', planId: '' });
+  const openAssign = async (preselectedPlanId?: number) => {
+    setAssignClient(null);
+    setAssignPlanId(preselectedPlanId ? String(preselectedPlanId) : '');
     setAssignDialog(true);
     void loadClients();
-    void loadServices();
   };
 
   const handleAssign = async () => {
+    if (!assignClient || !assignPlanId) return;
+    if (activeClientIds.has(assignClient.id)) {
+      setSnack({ open: true, message: l.activeMembershipWarning, severity: 'error' });
+      return;
+    }
     try {
-      await assignMembership(Number(assignForm.clientId), Number(assignForm.planId));
+      await assignMembership(assignClient.id, Number(assignPlanId));
       setSnack({ open: true, message: l.assigned, severity: 'success' });
       setAssignDialog(false);
-      await load();
+      await load(planFilter !== '' ? { planId: planFilter } : undefined);
     } catch (err) {
       setSnack({ open: true, message: getErrorMessage(err), severity: 'error' });
     }
@@ -321,58 +388,112 @@ export default function MembershipsPage() {
     try {
       await cancelMembership(id);
       setSnack({ open: true, message: l.cancelled, severity: 'success' });
-      await load();
+      await load(planFilter !== '' ? { planId: planFilter } : undefined);
     } catch (err) {
       setSnack({ open: true, message: getErrorMessage(err), severity: 'error' });
     }
   };
 
+  const viewPlanMembers = (planId: number) => {
+    setPlanFilter(planId);
+    setTab(1);
+    void load({ planId });
+  };
+
+  const handlePlanFilterChange = (value: number | '') => {
+    setPlanFilter(value);
+    void load(value !== '' ? { planId: value } : undefined);
+  };
+
+  const renderServicesCell = (serviceIds: number[] | undefined | null) => {
+    if (!serviceIds || serviceIds.length === 0) {
+      return <Chip label={l.allServices} size="small" color="default" variant="outlined" />;
+    }
+    const visible = serviceIds.slice(0, 2);
+    const rest = serviceIds.length - visible.length;
+    return (
+      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+        {visible.map((id) => (
+          <Chip key={id} label={serviceName(id)} size="small" variant="outlined" />
+        ))}
+        {rest > 0 && <Chip label={`+${rest}`} size="small" />}
+      </Stack>
+    );
+  };
+
   const planColumns: GridColDef[] = [
-    { field: 'nameAr', headerName: l.nameAr, flex: 1, minWidth: 150 },
-    { field: 'nameEn', headerName: l.nameEn, flex: 1, minWidth: 150 },
+    { field: 'nameAr', headerName: l.nameAr, flex: 1, minWidth: 130 },
+    { field: 'nameEn', headerName: l.nameEn, flex: 1, minWidth: 130 },
     {
       field: 'price',
       headerName: l.price,
-      width: 110,
+      width: 100,
       renderCell: (params) => formatMoney(params.value),
     },
-    { field: 'durationDays', headerName: l.durationDays, width: 110 },
+    { field: 'durationDays', headerName: l.durationDays, width: 90 },
     {
       field: 'discountPercent',
       headerName: l.discountPercent,
-      width: 110,
+      width: 90,
       renderCell: (params) => `${Number(params.value) || 0}%`,
+    },
+    {
+      field: 'serviceIds',
+      headerName: l.services,
+      flex: 1,
+      minWidth: 160,
+      sortable: false,
+      renderCell: (params) => renderServicesCell(params.value as number[]),
     },
     {
       field: 'membersCount',
       headerName: l.members,
-      width: 110,
-      renderCell: (params) => params.value ?? 0,
+      width: 100,
+      renderCell: (params) => {
+        const count = Number(params.value ?? 0);
+        const plan = params.row as MembershipPlan;
+        if (count === 0) return 0;
+        return (
+          <Button size="small" onClick={() => viewPlanMembers(plan.id)}>
+            {count}
+          </Button>
+        );
+      },
     },
     {
       field: 'actions',
       headerName: l.actions,
-      width: 120,
+      width: 150,
       sortable: false,
-      renderCell: (params: GridRenderCellParams) => (
-        <Stack direction="row" spacing={0}>
-          <IconButton
-            size="small"
-            disabled={!canWrite}
-            onClick={() => openPlanDialog(params.row as MembershipPlan)}
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            color="error"
-            disabled={!canWrite}
-            onClick={() => setDeleteTarget(params.row as MembershipPlan)}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      ),
+      renderCell: (params: GridRenderCellParams) => {
+        const plan = params.row as MembershipPlan;
+        return (
+          <Stack direction="row" spacing={0}>
+            {canWrite && (
+              <Tooltip title={l.assignToClient}>
+                <IconButton size="small" color="primary" onClick={() => void openAssign(plan.id)}>
+                  <PersonAddIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <IconButton
+              size="small"
+              disabled={!canWrite}
+              onClick={() => openPlanDialog(plan)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              color="error"
+              disabled={!canWrite}
+              onClick={() => setDeleteTarget(plan)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        );
+      },
     },
   ];
 
@@ -381,26 +502,53 @@ export default function MembershipsPage() {
       field: 'client',
       headerName: l.clientName,
       flex: 1,
-      minWidth: 150,
-      renderCell: (params) => params.value?.name ?? '-',
+      minWidth: 140,
+      renderCell: (params) => {
+        const client = params.value as ClientMembership['client'];
+        if (!client) return '-';
+        return (
+          <Stack spacing={0}>
+            <span>{client.name}</span>
+          </Stack>
+        );
+      },
     },
     {
       field: 'plan',
       headerName: l.plan,
       flex: 1,
+      minWidth: 130,
+      renderCell: (params) => nameOf(params.value as MembershipPlan),
+    },
+    {
+      field: 'planDiscount',
+      headerName: l.discountPercent,
+      width: 90,
+      sortable: false,
+      valueGetter: (_value, row) => Number((row as ClientMembership).plan?.discountPercent ?? 0),
+      renderCell: (params) => `${Number(params.value) || 0}%`,
+    },
+    {
+      field: 'planServices',
+      headerName: l.services,
+      flex: 1,
       minWidth: 140,
-      renderCell: (params) => nameOf(params.value),
+      sortable: false,
+      renderCell: (params) => {
+        const plan = (params.row as ClientMembership).plan;
+        return renderServicesCell(plan?.serviceIds);
+      },
     },
     {
       field: 'startDate',
       headerName: l.startDate,
-      width: 130,
+      width: 110,
       renderCell: (params) => new Date(params.value as string).toLocaleDateString('en-GB'),
     },
     {
       field: 'endDate',
       headerName: l.endDate,
-      width: 190,
+      width: 170,
       renderCell: (params) => {
         const d = new Date(params.value as string).toLocaleDateString('en-GB');
         const hijri = toHijri(params.value as string);
@@ -415,13 +563,14 @@ export default function MembershipsPage() {
     {
       field: 'remainingDays',
       headerName: l.remaining,
-      width: 100,
-      renderCell: (params) => (params.value !== undefined ? `${params.value} ${lang === 'ar' ? 'يوم' : 'd'}` : '-'),
+      width: 90,
+      renderCell: (params) =>
+        params.value !== undefined ? `${params.value} ${l.days}` : '-',
     },
     {
       field: 'status',
       headerName: l.status,
-      width: 110,
+      width: 100,
       renderCell: (params) => {
         const color =
           params.value === 'ACTIVE' ? 'success' : params.value === 'EXPIRED' ? 'warning' : 'error';
@@ -437,7 +586,7 @@ export default function MembershipsPage() {
     {
       field: 'actions',
       headerName: l.actions,
-      width: 110,
+      width: 100,
       sortable: false,
       renderCell: (params: GridRenderCellParams) =>
         params.row.status === 'ACTIVE' ? (
@@ -448,6 +597,12 @@ export default function MembershipsPage() {
     },
   ];
 
+  const assignBlocked =
+    !assignClient ||
+    !assignPlanId ||
+    !selectedAssignPlan?.isActive ||
+    (assignClient ? activeClientIds.has(assignClient.id) : false);
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -455,11 +610,28 @@ export default function MembershipsPage() {
         <ExportButtons endpoint="/memberships/plans/export" />
       </Stack>
 
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }} alignItems={{ sm: 'center' }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
           <Tab label={l.plans} />
           <Tab label={l.memberships} />
         </Tabs>
+        {tab === 1 && (
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>{l.filterByPlan}</InputLabel>
+            <Select
+              value={planFilter}
+              label={l.filterByPlan}
+              onChange={(e) => handlePlanFilterChange(e.target.value as number | '')}
+            >
+              <MenuItem value="">{l.allPlans}</MenuItem>
+              {plans.map((p) => (
+                <MenuItem key={p.id} value={p.id}>
+                  {nameOf(p)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <Box sx={{ flexGrow: 1 }} />
         {canWrite && tab === 0 && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => openPlanDialog(null)}>
@@ -553,14 +725,11 @@ export default function MembershipsPage() {
                   setPlanForm({ ...planForm, serviceIds: e.target.value as number[] })
                 }
                 label={l.services}
-                renderValue={(selected) =>
-                  (selected as number[])
-                    .map((id) => {
-                      const svc = services.find((s) => s.id === id);
-                      return svc ? (lang === 'ar' ? svc.nameAr : svc.nameEn) : String(id);
-                    })
-                    .join(', ')
-                }
+                renderValue={(selected) => {
+                  const ids = selected as number[];
+                  if (ids.length === 0) return l.allServices;
+                  return ids.map((id) => serviceName(id)).join(', ');
+                }}
               >
                 {services.map((svc) => (
                   <MenuItem key={svc.id} value={svc.id}>
@@ -568,6 +737,9 @@ export default function MembershipsPage() {
                   </MenuItem>
                 ))}
               </Select>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {l.servicesOptionalHint}
+              </Typography>
             </FormControl>
           </Stack>
         </DialogContent>
@@ -583,43 +755,98 @@ export default function MembershipsPage() {
         <DialogTitle>{l.assignTitle}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl fullWidth>
-              <InputLabel>{l.client}</InputLabel>
-              <Select
-                value={assignForm.clientId}
-                onChange={(e) => setAssignForm({ ...assignForm, clientId: e.target.value })}
-                label={l.client}
-              >
-                {clients.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete<Client>
+              options={clients}
+              getOptionLabel={(c) => c.name}
+              isOptionEqualToValue={(opt, val) => opt.id === val.id}
+              value={assignClient}
+              onChange={(_e, value) => setAssignClient(value)}
+              getOptionDisabled={(c) => activeClientIds.has(c.id)}
+              filterOptions={(options, state) => {
+                const q = state.inputValue.trim().toLowerCase();
+                if (q === '') return options;
+                return options.filter(
+                  (c) =>
+                    c.name.toLowerCase().includes(q) ||
+                    (c.phone ?? '').toLowerCase().includes(q) ||
+                    (c.whatsapp ?? '').toLowerCase().includes(q),
+                );
+              }}
+              renderOption={(props, c) => {
+                const { key, ...rest } = props as { key?: string };
+                const hasActive = activeClientIds.has(c.id);
+                const phone = c.phone || c.whatsapp;
+                return (
+                  <Box component="li" key={key ?? c.id} {...rest}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                      <Typography variant="body2" sx={{ flexGrow: 1, opacity: hasActive ? 0.5 : 1 }}>
+                        {c.name}
+                        {phone && (
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            {phone}
+                          </Typography>
+                        )}
+                      </Typography>
+                      {hasActive && (
+                        <Chip size="small" color="warning" label={l.hasActiveMembership} />
+                      )}
+                    </Box>
+                  </Box>
+                );
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label={l.client} placeholder={l.searchClientHint} />
+              )}
+            />
+
+            {assignClient && activeClientIds.has(assignClient.id) && (
+              <Alert severity="warning">{l.activeMembershipWarning}</Alert>
+            )}
+
             <FormControl fullWidth>
               <InputLabel>{l.plan}</InputLabel>
               <Select
-                value={assignForm.planId}
-                onChange={(e) => setAssignForm({ ...assignForm, planId: e.target.value })}
+                value={assignPlanId}
+                onChange={(e) => setAssignPlanId(e.target.value)}
                 label={l.plan}
               >
                 {plans.map((p) => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {nameOf(p)} - {formatMoney(p.price)}
+                  <MenuItem key={p.id} value={p.id} disabled={!p.isActive}>
+                    {nameOf(p)} — {formatMoney(p.price)}
+                    {!p.isActive && ` (${l.inactive})`}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+
+            {selectedAssignPlan && (
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  {l.planPreview}
+                </Typography>
+                <Stack spacing={0.5}>
+                  <Typography variant="body2">
+                    {nameOf(selectedAssignPlan)} — {formatMoney(selectedAssignPlan.price)} SAR
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {l.durationDays}: {selectedAssignPlan.durationDays} {l.days}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {l.discountPercent}: {Number(selectedAssignPlan.discountPercent) || 0}%
+                  </Typography>
+                  <Box sx={{ mt: 0.5 }}>{renderServicesCell(selectedAssignPlan.serviceIds)}</Box>
+                </Stack>
+              </Paper>
+            )}
+
+            {assignPlanId && !selectedAssignPlan?.isActive && (
+              <Alert severity="error">{l.selectActivePlan}</Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAssignDialog(false)}>{l.cancel}</Button>
-          <Button
-            variant="contained"
-            onClick={() => void handleAssign()}
-            disabled={!assignForm.clientId || !assignForm.planId}
-          >
+          <Button variant="contained" onClick={() => void handleAssign()} disabled={assignBlocked}>
             {l.assign}
           </Button>
         </DialogActions>

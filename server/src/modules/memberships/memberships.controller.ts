@@ -52,9 +52,19 @@ async function assign(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-async function listMemberships(_req: Request, res: Response, next: NextFunction) {
+async function listMemberships(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: await membershipsService.listMemberships() });
+    const planIdRaw = req.query.planId;
+    const planId =
+      planIdRaw !== undefined && planIdRaw !== '' ? Number(planIdRaw) : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    res.json({
+      success: true,
+      data: await membershipsService.listMemberships({
+        ...(Number.isInteger(planId) ? { planId } : {}),
+        ...(status ? { status } : {}),
+      }),
+    });
   } catch (err) {
     next(err);
   }

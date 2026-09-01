@@ -67,8 +67,15 @@ export const updatePlan = (id: number, data: Partial<PlanInput>) =>
 export const deletePlan = (id: number) =>
   api.delete<{ success: boolean; data: { id: number } }>(`/memberships/plans/${id}`).then(unwrap);
 
-export const listMemberships = () =>
-  api.get<{ success: boolean; data: ClientMembership[] }>('/memberships').then(unwrap);
+export const listMemberships = (params?: { planId?: number; status?: string }) => {
+  const search = new URLSearchParams();
+  if (params?.planId) search.set('planId', String(params.planId));
+  if (params?.status) search.set('status', params.status);
+  const qs = search.toString();
+  return api
+    .get<{ success: boolean; data: ClientMembership[] }>(`/memberships${qs ? `?${qs}` : ''}`)
+    .then(unwrap);
+};
 
 export const assignMembership = (clientId: number, planId: number) =>
   api
