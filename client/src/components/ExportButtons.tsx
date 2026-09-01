@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import GridOnIcon from '@mui/icons-material/GridOn';
@@ -37,7 +38,7 @@ export default function ExportButtons({
   };
 
   return (
-    <>
+    <Stack direction="row" spacing={0} alignItems="center" sx={{ flexShrink: 0 }}>
       <Tooltip title={lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}>
         <span>
           <IconButton
@@ -62,6 +63,6 @@ export default function ExportButtons({
           </IconButton>
         </span>
       </Tooltip>
-    </>
+    </Stack>
   );
 }
