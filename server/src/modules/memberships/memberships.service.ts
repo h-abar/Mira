@@ -160,9 +160,9 @@ async function cancelMembership(id: number) {
   });
 }
 
-async function searchClientsForAssign(q?: string, limit = 50) {
+async function searchClientsForAssign(q?: string, limit = 500) {
   const term = q?.trim();
-  const take = Math.min(Math.max(limit, 1), 100);
+  const take = Math.min(Math.max(limit, 1), 500);
 
   const where: Prisma.ClientWhereInput = term
     ? {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery, useTheme } from '@mui/material';
 import {
@@ -216,8 +216,6 @@ export default function MembershipsPage() {
   const [loading, setLoading] = useState(false);
   const [assignClientOptions, setAssignClientOptions] = useState<MembershipClientOption[]>([]);
   const [assignClientsLoading, setAssignClientsLoading] = useState(false);
-  const [clientSearchInput, setClientSearchInput] = useState('');
-  const clientSearchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [planFilter, setPlanFilter] = useState<number | ''>('');
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -252,10 +250,10 @@ export default function MembershipsPage() {
     [assignPlanId, plans],
   );
 
-  const fetchAssignClients = useCallback(async (q: string) => {
+  const fetchAssignClients = useCallback(async () => {
     setAssignClientsLoading(true);
     try {
-      const items = await searchMembershipClients(q, 50);
+      const items = await searchMembershipClients(undefined, 500);
       setAssignClientOptions(items);
     } catch (err) {
       setAssignClientOptions([]);
@@ -264,16 +262,6 @@ export default function MembershipsPage() {
       setAssignClientsLoading(false);
     }
   }, []);
-
-  const scheduleClientSearch = useCallback(
-    (q: string) => {
-      clearTimeout(clientSearchTimer.current);
-      clientSearchTimer.current = setTimeout(() => {
-        void fetchAssignClients(q);
-      }, 300);
-    },
-    [fetchAssignClients],
-  );
 
   const load = async (membershipFilters?: { planId?: number }) => {
     setLoading(true);
@@ -374,11 +362,9 @@ export default function MembershipsPage() {
 
   const openAssign = async (preselectedPlanId?: number) => {
     setAssignClient(null);
-    setClientSearchInput('');
-    setAssignClientOptions([]);
     setAssignPlanId(preselectedPlanId ? String(preselectedPlanId) : '');
     setAssignDialog(true);
-    void fetchAssignClients('');
+    void fetchAssignClients();
   };
 
   const handleAssign = async () => {
@@ -775,19 +761,22 @@ export default function MembershipsPage() {
               getOptionLabel={(c) => c.name}
               isOptionEqualToValue={(opt, val) => opt.id === val.id}
               value={assignClient}
-              inputValue={clientSearchInput}
               onChange={(_e, value) => setAssignClient(value)}
-              onInputChange={(_e, value, reason) => {
-                if (reason === 'reset') return;
-                setClientSearchInput(value);
-                scheduleClientSearch(value);
-              }}
               onOpen={() => {
-                if (assignClientOptions.length === 0) {
-                  void fetchAssignClients(clientSearchInput);
+                if (assignClientOptions.length === 0 && !assignClientsLoading) {
+                  void fetchAssignClients();
                 }
               }}
-              filterOptions={(options) => options}
+              filterOptions={(options, state) => {
+                const q = state.inputValue.trim().toLowerCase();
+                if (q === '') return options;
+                return options.filter(
+                  (c) =>
+                    c.name.toLowerCase().includes(q) ||
+                    (c.phone ?? '').toLowerCase().includes(q) ||
+                    (c.whatsapp ?? '').toLowerCase().includes(q),
+                );
+              }}
               noOptionsText={assignClientsLoading ? l.loading : l.noClients}
               getOptionDisabled={(c) => c.hasActiveMembership}
               renderOption={(props, c) => {

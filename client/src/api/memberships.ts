@@ -100,7 +100,7 @@ export const getActiveMembership = (clientId: number) =>
     .get<{ success: boolean; data: ActiveMembership | null }>(`/memberships/client/${clientId}`)
     .then(unwrap);
 
-export const searchMembershipClients = (q?: string, limit = 50) => {
+export const searchMembershipClients = (q?: string, limit = 500) => {
   const search = new URLSearchParams();
   if (q?.trim()) search.set('q', q.trim());
   search.set('limit', String(limit));

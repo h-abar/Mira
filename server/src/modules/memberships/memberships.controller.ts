@@ -86,12 +86,12 @@ async function searchClients(req: Request, res: Response, next: NextFunction) {
   try {
     const q = typeof req.query.q === 'string' ? req.query.q : undefined;
     const limitRaw = req.query.limit;
-    const limit = limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : 50;
+    const limit = limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : 500;
     res.json({
       success: true,
       data: await membershipsService.searchClientsForAssign(
         q,
-        Number.isInteger(limit) ? limit : 50,
+        Number.isInteger(limit) ? limit : 500,
       ),
     });
   } catch (err) {
