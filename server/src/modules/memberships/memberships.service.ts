@@ -160,6 +160,46 @@ async function cancelMembership(id: number) {
   });
 }
 
+async function searchClientsForAssign(q?: string, limit = 50) {
+  const term = q?.trim();
+  const take = Math.min(Math.max(limit, 1), 100);
+
+  const where: Prisma.ClientWhereInput = term
+    ? {
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { phone: { contains: term, mode: 'insensitive' } },
+          { whatsapp: { contains: term, mode: 'insensitive' } },
+        ],
+      }
+    : {};
+
+  const clients = await prisma.client.findMany({
+    where,
+    orderBy: { name: 'asc' },
+    take,
+    select: { id: true, name: true, phone: true, whatsapp: true },
+  });
+
+  if (clients.length === 0) return [];
+
+  const now = new Date();
+  const activeRows = await prisma.clientMembership.findMany({
+    where: {
+      clientId: { in: clients.map((c) => c.id) },
+      status: 'ACTIVE',
+      endDate: { gte: now },
+    },
+    select: { clientId: true },
+  });
+  const activeIds = new Set(activeRows.map((r) => r.clientId));
+
+  return clients.map((c) => ({
+    ...c,
+    hasActiveMembership: activeIds.has(c.id),
+  }));
+}
+
 export const membershipsService = {
   listPlans,
   createPlan,
@@ -168,4 +208,5 @@ export const membershipsService = {
   assign,
   listMemberships,
   cancelMembership,
+  searchClientsForAssign,
 };

@@ -82,6 +82,23 @@ async function cancelMembership(req: Request, res: Response, next: NextFunction)
   }
 }
 
+async function searchClients(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const limitRaw = req.query.limit;
+    const limit = limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : 50;
+    res.json({
+      success: true,
+      data: await membershipsService.searchClientsForAssign(
+        q,
+        Number.isInteger(limit) ? limit : 50,
+      ),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getClientMembership(req: Request, res: Response, next: NextFunction) {
   try {
     const clientId = Number(req.params.clientId);
@@ -162,6 +179,7 @@ export const membershipsController = {
   assign,
   listMemberships,
   cancelMembership,
+  searchClients,
   getClientMembership,
   exportPlans,
 };

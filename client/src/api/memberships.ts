@@ -35,6 +35,14 @@ export interface PlanInput {
   discountPercent?: number;
 }
 
+export interface MembershipClientOption {
+  id: number;
+  name: string;
+  phone?: string | null;
+  whatsapp?: string | null;
+  hasActiveMembership: boolean;
+}
+
 export interface ActiveMembership {
   id: number;
   clientId: number;
@@ -91,3 +99,12 @@ export const getActiveMembership = (clientId: number) =>
   api
     .get<{ success: boolean; data: ActiveMembership | null }>(`/memberships/client/${clientId}`)
     .then(unwrap);
+
+export const searchMembershipClients = (q?: string, limit = 50) => {
+  const search = new URLSearchParams();
+  if (q?.trim()) search.set('q', q.trim());
+  search.set('limit', String(limit));
+  return api
+    .get<{ success: boolean; data: MembershipClientOption[] }>(`/memberships/clients/search?${search}`)
+    .then(unwrap);
+};

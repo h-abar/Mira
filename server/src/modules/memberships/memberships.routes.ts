@@ -31,6 +31,7 @@ router.put('/plans/:id', validate(planUpdateSchema), membershipsController.updat
 router.delete('/plans/:id', membershipsController.removePlan);
 
 router.get('/', membershipsController.listMemberships);
+router.get('/clients/search', membershipsController.searchClients);
 router.post('/assign', validate(assignSchema), membershipsController.assign);
 router.post('/:id/cancel', membershipsController.cancelMembership);
 

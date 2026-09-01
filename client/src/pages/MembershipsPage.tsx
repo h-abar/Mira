@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery, useTheme } from '@mui/material';
 import {
@@ -28,6 +28,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import Tooltip from '@mui/material/Tooltip';
+import CircularProgress from '@mui/material/CircularProgress';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -41,11 +42,12 @@ import {
   listMemberships,
   assignMembership,
   cancelMembership,
+  searchMembershipClients,
   type MembershipPlan,
   type ClientMembership,
   type PlanInput,
+  type MembershipClientOption,
 } from '../api/memberships';
-import { listClients, type Client } from '../api/clients';
 import { listServices, type Service } from '../api/services';
 import { useAuthStore } from '../stores/authStore';
 import { isArabicText, isLatinText } from '../utils/languageValidation';
@@ -108,6 +110,7 @@ const L = {
     days: 'يوم',
     inactive: 'غير نشطة',
     selectActivePlan: 'اختر باقة نشطة',
+    noClients: 'لا توجد عميلات',
   },
   en: {
     title: 'Memberships & Plans',
@@ -163,6 +166,7 @@ const L = {
     days: 'days',
     inactive: 'Inactive',
     selectActivePlan: 'Select an active plan',
+    noClients: 'No clients found',
   },
 } as const;
 
@@ -208,9 +212,12 @@ export default function MembershipsPage() {
   const [tab, setTab] = useState(0);
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [memberships, setMemberships] = useState<ClientMembership[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
+  const [assignClientOptions, setAssignClientOptions] = useState<MembershipClientOption[]>([]);
+  const [assignClientsLoading, setAssignClientsLoading] = useState(false);
+  const [clientSearchInput, setClientSearchInput] = useState('');
+  const clientSearchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [planFilter, setPlanFilter] = useState<number | ''>('');
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -225,7 +232,7 @@ export default function MembershipsPage() {
   const [planForm, setPlanForm] = useState<PlanForm>(emptyPlanForm());
   const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
   const [assignDialog, setAssignDialog] = useState(false);
-  const [assignClient, setAssignClient] = useState<Client | null>(null);
+  const [assignClient, setAssignClient] = useState<MembershipClientOption | null>(null);
   const [assignPlanId, setAssignPlanId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<MembershipPlan | null>(null);
 
@@ -240,19 +247,32 @@ export default function MembershipsPage() {
     [services, lang],
   );
 
-  const activeClientIds = useMemo(() => {
-    const ids = new Set<number>();
-    for (const m of memberships) {
-      if (m.status === 'ACTIVE' && (m.remainingDays ?? 0) >= 0) {
-        ids.add(m.clientId);
-      }
-    }
-    return ids;
-  }, [memberships]);
-
   const selectedAssignPlan = useMemo(
     () => (assignPlanId ? plans.find((p) => p.id === Number(assignPlanId)) ?? null : null),
     [assignPlanId, plans],
+  );
+
+  const fetchAssignClients = useCallback(async (q: string) => {
+    setAssignClientsLoading(true);
+    try {
+      const items = await searchMembershipClients(q, 50);
+      setAssignClientOptions(items);
+    } catch (err) {
+      setAssignClientOptions([]);
+      setSnack({ open: true, message: getErrorMessage(err), severity: 'error' });
+    } finally {
+      setAssignClientsLoading(false);
+    }
+  }, []);
+
+  const scheduleClientSearch = useCallback(
+    (q: string) => {
+      clearTimeout(clientSearchTimer.current);
+      clientSearchTimer.current = setTimeout(() => {
+        void fetchAssignClients(q);
+      }, 300);
+    },
+    [fetchAssignClients],
   );
 
   const load = async (membershipFilters?: { planId?: number }) => {
@@ -275,15 +295,6 @@ export default function MembershipsPage() {
     void load();
     void loadServices();
   }, []);
-
-  const loadClients = async () => {
-    try {
-      const res = await listClients({ limit: 500 });
-      setClients(res.items);
-    } catch {
-      /* ignore */
-    }
-  };
 
   const loadServices = async () => {
     try {
@@ -363,14 +374,16 @@ export default function MembershipsPage() {
 
   const openAssign = async (preselectedPlanId?: number) => {
     setAssignClient(null);
+    setClientSearchInput('');
+    setAssignClientOptions([]);
     setAssignPlanId(preselectedPlanId ? String(preselectedPlanId) : '');
     setAssignDialog(true);
-    void loadClients();
+    void fetchAssignClients('');
   };
 
   const handleAssign = async () => {
     if (!assignClient || !assignPlanId) return;
-    if (activeClientIds.has(assignClient.id)) {
+    if (assignClient.hasActiveMembership) {
       setSnack({ open: true, message: l.activeMembershipWarning, severity: 'error' });
       return;
     }
@@ -601,7 +614,7 @@ export default function MembershipsPage() {
     !assignClient ||
     !assignPlanId ||
     !selectedAssignPlan?.isActive ||
-    (assignClient ? activeClientIds.has(assignClient.id) : false);
+    assignClient.hasActiveMembership;
 
   return (
     <Box>
@@ -755,31 +768,35 @@ export default function MembershipsPage() {
         <DialogTitle>{l.assignTitle}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Autocomplete<Client>
-              options={clients}
+            <Autocomplete<MembershipClientOption>
+              openOnFocus
+              loading={assignClientsLoading}
+              options={assignClientOptions}
               getOptionLabel={(c) => c.name}
               isOptionEqualToValue={(opt, val) => opt.id === val.id}
               value={assignClient}
+              inputValue={clientSearchInput}
               onChange={(_e, value) => setAssignClient(value)}
-              getOptionDisabled={(c) => activeClientIds.has(c.id)}
-              filterOptions={(options, state) => {
-                const q = state.inputValue.trim().toLowerCase();
-                if (q === '') return options;
-                return options.filter(
-                  (c) =>
-                    c.name.toLowerCase().includes(q) ||
-                    (c.phone ?? '').toLowerCase().includes(q) ||
-                    (c.whatsapp ?? '').toLowerCase().includes(q),
-                );
+              onInputChange={(_e, value, reason) => {
+                if (reason === 'reset') return;
+                setClientSearchInput(value);
+                scheduleClientSearch(value);
               }}
+              onOpen={() => {
+                if (assignClientOptions.length === 0) {
+                  void fetchAssignClients(clientSearchInput);
+                }
+              }}
+              filterOptions={(options) => options}
+              noOptionsText={assignClientsLoading ? l.loading : l.noClients}
+              getOptionDisabled={(c) => c.hasActiveMembership}
               renderOption={(props, c) => {
                 const { key, ...rest } = props as { key?: string };
-                const hasActive = activeClientIds.has(c.id);
                 const phone = c.phone || c.whatsapp;
                 return (
                   <Box component="li" key={key ?? c.id} {...rest}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                      <Typography variant="body2" sx={{ flexGrow: 1, opacity: hasActive ? 0.5 : 1 }}>
+                      <Typography variant="body2" sx={{ flexGrow: 1, opacity: c.hasActiveMembership ? 0.5 : 1 }}>
                         {c.name}
                         {phone && (
                           <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
@@ -787,7 +804,7 @@ export default function MembershipsPage() {
                           </Typography>
                         )}
                       </Typography>
-                      {hasActive && (
+                      {c.hasActiveMembership && (
                         <Chip size="small" color="warning" label={l.hasActiveMembership} />
                       )}
                     </Box>
@@ -795,11 +812,24 @@ export default function MembershipsPage() {
                 );
               }}
               renderInput={(params) => (
-                <TextField {...params} label={l.client} placeholder={l.searchClientHint} />
+                <TextField
+                  {...params}
+                  label={l.client}
+                  placeholder={l.searchClientHint}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {assignClientsLoading ? <CircularProgress color="inherit" size={18} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
               )}
             />
 
-            {assignClient && activeClientIds.has(assignClient.id) && (
+            {assignClient?.hasActiveMembership && (
               <Alert severity="warning">{l.activeMembershipWarning}</Alert>
             )}
 
