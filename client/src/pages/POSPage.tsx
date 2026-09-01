@@ -12,6 +12,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import FormControl from '@mui/material/FormControl';
+import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
@@ -59,6 +60,9 @@ import PageHeader from '../components/PageHeader';
 
 const L = {
   ar: {
+    clientSection: 'العميلة',
+    paymentSection: 'الدفع',
+    discountsSection: 'الخصومات والولاء',
     title: 'نقطة بيع سريعة',
     client: 'العميلة',
     newClient: 'عميلة جديدة',
@@ -146,6 +150,9 @@ const L = {
     requiredItems: 'يرجى إضافة عنصر واحد على الأقل',
   },
   en: {
+    clientSection: 'Client',
+    paymentSection: 'Payment',
+    discountsSection: 'Discounts & Loyalty',
     title: 'Quick POS',
     client: 'Client',
     newClient: 'New client',
@@ -822,192 +829,259 @@ export default function POSPage() {
       ) : (
         <>
           <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, mb: 2 }}>
-            <Stack spacing={4}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
-              <Button
-                variant="outlined"
-                startIcon={<PersonAddIcon />}
-                onClick={() => setNewClientOpen(true)}
-              >
-                {l.newClient}
-              </Button>
-              <Autocomplete<Client>
-                size="small"
-                sx={{ flexGrow: 1, width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 260 } }}
-                options={clients}
-                getOptionLabel={(c) => c.name}
-                isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                value={selectedClient}
-                onChange={(_e, value) => setSelectedClient(value)}
-                filterOptions={(options, state) => {
-                  const q = state.inputValue.trim().toLowerCase();
-                  if (q === '') return options;
-                  return options.filter(
-                    (c) =>
-                      c.name.toLowerCase().includes(q) ||
-                      (c.phone ?? '').toLowerCase().includes(q) ||
-                      (c.whatsapp ?? '').toLowerCase().includes(q),
-                  );
-                }}
-                renderOption={(props, c) => {
-                  const { key, ...rest } = props as { key?: string };
-                  return (
-                    <Box component="li" key={key ?? c.id} {...rest}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                        <Typography variant="body2" sx={{ flexGrow: 1 }}>
-                          {c.name}
-                          {(c.phone || c.whatsapp) && (
-                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                              {c.phone || c.whatsapp}
+            <Stack spacing={2.5}>
+              {/* ① Client */}
+              <Box>
+                <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>
+                  {l.clientSection}
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'stretch' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => setNewClientOpen(true)}
+                    sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', sm: 'center' } }}
+                  >
+                    {l.newClient}
+                  </Button>
+                  <Autocomplete<Client>
+                    size="small"
+                    sx={{ flexGrow: 1, minWidth: 0 }}
+                    options={clients}
+                    getOptionLabel={(c) => c.name}
+                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                    value={selectedClient}
+                    onChange={(_e, value) => setSelectedClient(value)}
+                    filterOptions={(options, state) => {
+                      const q = state.inputValue.trim().toLowerCase();
+                      if (q === '') return options;
+                      return options.filter(
+                        (c) =>
+                          c.name.toLowerCase().includes(q) ||
+                          (c.phone ?? '').toLowerCase().includes(q) ||
+                          (c.whatsapp ?? '').toLowerCase().includes(q),
+                      );
+                    }}
+                    renderOption={(props, c) => {
+                      const { key, ...rest } = props as { key?: string };
+                      return (
+                        <Box component="li" key={key ?? c.id} {...rest}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                            <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                              {c.name}
+                              {(c.phone || c.whatsapp) && (
+                                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                                  {c.phone || c.whatsapp}
+                                </Typography>
+                              )}
                             </Typography>
-                          )}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                          label={`${l.loyaltyPoints}: ${c.loyaltyPoints ?? 0}`}
-                        />
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField {...params} label={l.client} placeholder={l.searchClientHint} />
-                )}
-              />
-              {selectedClient && (
-                <Chip
-                  color="primary"
-                  label={`${selectedClient.name} — ${l.loyaltyPoints}: ${selectedClient.loyaltyPoints ?? 0}`}
-                />
-              )}
-              </Stack>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} rowGap={1.5} flexWrap="wrap">
-              <FormControl size="small" sx={{ width: { xs: '100%', lg: 155 } }}>
-                <InputLabel id="pos-employee-label">{l.employeeForAll}</InputLabel>
-                <Select<number | ''>
-                  labelId="pos-employee-label"
-                  label={l.employeeForAll}
-                  value={employeeId}
-                  onChange={(e: SelectChangeEvent<number | ''>) => {
-                    const val = e.target.value as number | '';
-                    setEmployeeId(val);
-                    // Applying to the whole cart — same person can perform all services.
-                    if (val !== '') {
-                      setCart((prev) => prev.map((c) => ({ ...c, employeeId: val })));
-                    }
-                  }}
-                >
-                  <MenuItem value="" disabled>
-                    {l.selectEmployee}
-                  </MenuItem>
-                  {performers.map((emp) => (
-                    <MenuItem key={emp.id} value={emp.id}>
-                      {nameOf(emp)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl size="small" sx={{ width: { xs: '100%', lg: 130 } }}>
-                <InputLabel id="pos-payment-label">{l.paymentMethod}</InputLabel>
-                <Select<PaymentMethod>
-                  labelId="pos-payment-label"
-                  label={l.paymentMethod}
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                >
-                  {PAYMENT_METHODS.map((method) => (
-                    <MenuItem key={method} value={method}>
-                      {paymentLabels[method]}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {paymentMethod === 'BANK_TRANSFER' && (
-                <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1} sx={{ width: { xs: '100%', lg: 320 } }}>
-                  <TextField
-                    size="small"
-                    label={l.bankName}
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    sx={{ flex: 1 }}
-                  />
-                  <TextField
-                    size="small"
-                    label={l.bankReference}
-                    value={bankReference}
-                    onChange={(e) => setBankReference(e.target.value)}
-                    sx={{ flex: 1 }}
+                            <Chip
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              label={`${l.loyaltyPoints}: ${c.loyaltyPoints ?? 0}`}
+                            />
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                    renderInput={(params) => (
+                      <TextField {...params} label={l.client} placeholder={l.searchClientHint} />
+                    )}
                   />
                 </Stack>
-              )}
+              </Box>
 
-              <TextField
-                size="small"
-                label={l.discount}
-                type="number"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                inputProps={{ min: 0, step: '0.01' }}
-                sx={{ width: { xs: '100%', lg: 105 } }}
-              />
-              <FormControlLabel
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1.5,
-                  px: 1,
-                  py: 0.25,
-                }}
-                control={
-                  <Switch
-                    checked={taxEnabled}
-                    onChange={(e) => setTaxEnabled(e.target.checked)}
-                  />
-                }
-                label={
-                  <Typography variant="caption">
-                    {l.taxApplicable} {taxEnabled ? `(${vatRate}%)` : ''}
-                  </Typography>
-                }
-              />
-              <TextField
-                size="small"
-                label={l.offerCode}
-                value={offerCode}
-                onChange={(e) => setOfferCode(e.target.value)}
-                sx={{ width: { xs: '100%', lg: 145 } }}
-              />
-              <TextField
-                size="small"
-                label={`${l.redeemPoints}${redeemNum > 0 ? ` (= ${redeemValue.toFixed(2)})` : ''}`}
-                type="number"
-                value={redeemPoints}
-                onChange={(e) => setRedeemPoints(e.target.value)}
-                inputProps={{ min: 0, step: 1, max: clientPoints }}
-                error={redeemNum > clientPoints}
-                sx={{ width: { xs: '100%', lg: 150 } }}
-              />
-              <TextField
-                size="small"
-                label={l.tip}
-                type="number"
-                value={tip}
-                onChange={(e) => setTip(e.target.value)}
-                inputProps={{ min: 0, step: '0.01' }}
-                sx={{ width: { xs: '100%', lg: 100 } }}
-              />
-              <TextField
-                size="small"
-                label={l.giftCardCode}
-                value={giftCardCode}
-                onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
-                sx={{ width: { xs: '100%', lg: 150 } }}
-              />
-            </Stack>
+              <Divider />
+
+              {/* ② Payment */}
+              <Box>
+                <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>
+                  {l.paymentSection}
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel id="pos-employee-label">{l.employeeForAll}</InputLabel>
+                      <Select<number | ''>
+                        labelId="pos-employee-label"
+                        label={l.employeeForAll}
+                        value={employeeId}
+                        onChange={(e: SelectChangeEvent<number | ''>) => {
+                          const val = e.target.value as number | '';
+                          setEmployeeId(val);
+                          if (val !== '') {
+                            setCart((prev) => prev.map((c) => ({ ...c, employeeId: val })));
+                          }
+                        }}
+                      >
+                        <MenuItem value="" disabled>
+                          {l.selectEmployee}
+                        </MenuItem>
+                        {performers.map((emp) => (
+                          <MenuItem key={emp.id} value={emp.id}>
+                            {nameOf(emp)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel id="pos-payment-label">{l.paymentMethod}</InputLabel>
+                      <Select<PaymentMethod>
+                        labelId="pos-payment-label"
+                        label={l.paymentMethod}
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                      >
+                        {PAYMENT_METHODS.map((method) => (
+                          <MenuItem key={method} value={method}>
+                            {paymentLabels[method]}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label={l.tip}
+                      type="number"
+                      value={tip}
+                      onChange={(e) => setTip(e.target.value)}
+                      inputProps={{ min: 0, step: '0.01' }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControlLabel
+                      sx={{
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1.5,
+                        px: 1,
+                        py: 0.75,
+                        m: 0,
+                        width: '100%',
+                        height: '100%',
+                        alignItems: 'center',
+                      }}
+                      control={
+                        <Switch
+                          checked={taxEnabled}
+                          onChange={(e) => setTaxEnabled(e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Typography variant="caption">
+                          {l.taxApplicable} {taxEnabled ? `(${vatRate}%)` : ''}
+                        </Typography>
+                      }
+                    />
+                  </Grid>
+                  {paymentMethod === 'BANK_TRANSFER' && (
+                    <>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={l.bankName}
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={l.bankReference}
+                          value={bankReference}
+                          onChange={(e) => setBankReference(e.target.value)}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                </Grid>
+              </Box>
+
+              {/* ③ Discounts & loyalty — only when client selected */}
+              {selectedClient && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>
+                      {l.discountsSection}
+                    </Typography>
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={l.discount}
+                          type="number"
+                          value={discount}
+                          onChange={(e) => setDiscount(e.target.value)}
+                          inputProps={{ min: 0, step: '0.01' }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={l.offerCode}
+                          value={offerCode}
+                          onChange={(e) => setOfferCode(e.target.value)}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={l.giftCardCode}
+                          value={giftCardCode}
+                          onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={`${l.redeemPoints}${redeemNum > 0 ? ` (= ${redeemValue.toFixed(2)})` : ''}`}
+                          type="number"
+                          value={redeemPoints}
+                          onChange={(e) => setRedeemPoints(e.target.value)}
+                          inputProps={{ min: 0, step: 1, max: clientPoints }}
+                          error={redeemNum > clientPoints}
+                        />
+                      </Grid>
+                    </Grid>
+                    {clientPoints > 0 && (
+                      <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 1.5 }}>
+                        {[25, 50, 100]
+                          .filter((n) => n <= clientPoints)
+                          .map((n) => (
+                            <Chip
+                              key={n}
+                              label={`${l.usePoints} ${n}`}
+                              onClick={() => setRedeemPoints(String(n))}
+                              size="small"
+                              color={redeemNum === n ? 'primary' : 'default'}
+                              variant={redeemNum === n ? 'filled' : 'outlined'}
+                            />
+                          ))}
+                        <Chip
+                          label={l.useAllPoints}
+                          onClick={() => setRedeemPoints(String(clientPoints))}
+                          size="small"
+                          color={redeemNum === clientPoints ? 'primary' : 'default'}
+                          variant={redeemNum === clientPoints ? 'filled' : 'outlined'}
+                        />
+                      </Stack>
+                    )}
+                  </Box>
+                </>
+              )}
             </Stack>
           </Paper>
 

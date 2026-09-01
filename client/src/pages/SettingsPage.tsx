@@ -82,6 +82,20 @@ const ZATCA_SELECT_OPTIONS: Record<string, { value: string; ar: string; en: stri
   ],
 };
 
+const SECTION_SAVED: Record<string, keyof typeof L.ar> = {
+  identity: 'savedIdentity',
+  invoicing: 'savedInvoicing',
+  social: 'savedSocial',
+  hours: 'savedHours',
+  loyalty: 'savedLoyalty',
+  zatca: 'savedZatca',
+  payments: 'savedPayments',
+  whatsapp: 'savedWhatsapp',
+  'cat-services': 'savedCategories',
+  'cat-inventory': 'savedCategories',
+};
+
+const SECRET_MASK = '••••••••';
 const DAY_ORDER = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const;
 const DAY_AR: Record<string, string> = {
   Sat: 'السبت',
@@ -119,6 +133,15 @@ const L = {
     socialTitle: 'حسابات وسائل التواصل الاجتماعي',
     socialNote: 'تُعرض هذه الروابط في صفحة الواجهة وبطاقة العميلة والفواتير المطبوعة.',
     saveSocialBtn: 'حفظ وسائل التواصل',
+    savedIdentity: 'تم حفظ هوية الصالون',
+    savedInvoicing: 'تم حفظ إعدادات الفوترة',
+    savedSocial: 'تم حفظ حسابات التواصل الاجتماعي',
+    savedHours: 'تم حفظ ساعات وأيام العمل',
+    savedLoyalty: 'تم حفظ إعدادات الولاء',
+    savedZatca: 'تم حفظ إعدادات ZATCA',
+    savedPayments: 'تم حفظ إعدادات المدفوعات',
+    savedWhatsapp: 'تم حفظ إعدادات واتساب',
+    savedCategories: 'تم حفظ الفئات',
     hoursNote: 'حدد أيام وساعات العمل للصالون. الأيام المفعلة كـ (يوم عمل) تتاح لحجز المواعيد، والأيام غير المفعلة تعتبر إجازة أسبوعية مغلقة.',
     hoursOpen: 'وقت الفتح', hoursClose: 'وقت الإغلاق', hoursWorkDay: 'يوم عمل مفعّل', hoursDayOff: 'إجازة أسبوعية',
     hoursCopy: 'نسخ ساعات هذا اليوم لجميع الأيام المفتوحة',
@@ -178,6 +201,15 @@ const L = {
     socialTitle: 'Social Media Accounts',
     socialNote: 'These links appear on the client portal, receipts, and printed invoices.',
     saveSocialBtn: 'Save Social Media',
+    savedIdentity: 'Salon identity saved',
+    savedInvoicing: 'Invoicing settings saved',
+    savedSocial: 'Social media accounts saved',
+    savedHours: 'Working hours saved',
+    savedLoyalty: 'Loyalty settings saved',
+    savedZatca: 'ZATCA settings saved',
+    savedPayments: 'Payment settings saved',
+    savedWhatsapp: 'WhatsApp settings saved',
+    savedCategories: 'Categories saved',
     hoursNote: 'Set salon working hours and active workdays. Active days allow bookings; inactive days are marked as weekly days off.',
     hoursOpen: 'Opening', hoursClose: 'Closing', hoursWorkDay: 'Work Day (Active)', hoursDayOff: 'Day Off',
     hoursCopy: 'Copy hours to all open days',
@@ -385,14 +417,30 @@ export default function SettingsPage() {
     </Box>
   );
 
+  const mergeSavedSettings = (keys: readonly string[], items: { key: string; value: string }[]) => {
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const item of items) {
+        if (!keys.includes(item.key)) continue;
+        if (item.value === SECRET_MASK) continue;
+        next[item.key] = item.value;
+      }
+      return next;
+    });
+  };
+
+  const sectionSaving = (section: string) => savingSection === section;
+
   const saveKeys = async (keys: readonly string[], section: string) => {
     const payload: Record<string, string> = {};
     for (const key of keys) payload[key] = values[key] ?? '';
     setSavingSection(section);
     setError(null);
     try {
-      await updateMutation.mutateAsync(payload);
-      setSnack(l.saved);
+      const result = await updateMutation.mutateAsync(payload);
+      mergeSavedSettings(keys, result.items);
+      const msgKey = SECTION_SAVED[section];
+      setSnack(msgKey ? l[msgKey] : l.saved);
     } catch (err) {
       setError((err as { message?: string }).message ?? l.saveFailed);
     } finally {
@@ -424,8 +472,13 @@ export default function SettingsPage() {
     setSavingSection('hours');
     setError(null);
     try {
-      await updateMutation.mutateAsync(payload);
-      setSnack(l.saved);
+      const result = await updateMutation.mutateAsync(payload);
+      const hourKeys = [
+        'CLOSED_DAYS',
+        ...weekly.flatMap((r) => [`${r.day.toUpperCase()}_OPENING`, `${r.day.toUpperCase()}_CLOSING`]),
+      ];
+      mergeSavedSettings(hourKeys, result.items);
+      setSnack(l.savedHours);
     } catch (err) {
       setError((err as { message?: string }).message ?? l.saveFailed);
     } finally {
@@ -682,7 +735,7 @@ export default function SettingsPage() {
             variant="contained"
             startIcon={savingSection === `cat-${t}` ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
             onClick={() => void saveKeys([CAT_KEY[t]], `cat-${t}`)}
-            disabled={savingSection !== null}
+            disabled={sectionSaving(`cat-${t}`)}
           >
             {savingSection === `cat-${t}` ? l.saving : l.save}
           </Button>
@@ -833,7 +886,7 @@ export default function SettingsPage() {
                     onClick={() =>
                       void saveKeys(['SALON_NAME_AR', 'SALON_NAME_EN', 'SALON_LOGO_URL'], 'identity')
                     }
-                    disabled={savingSection !== null}
+                    disabled={sectionSaving('identity')}
                     sx={{ mt: 2, alignSelf: 'flex-start' }}
                   >
                     {savingSection === 'identity' ? l.saving : lang === 'ar' ? 'حفظ هوية الصالون' : 'Save Salon Identity'}
@@ -863,7 +916,7 @@ export default function SettingsPage() {
                     color="secondary"
                     startIcon={savingSection === 'invoicing' ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
                     onClick={() => void saveKeys(['VAT_RATE', 'WELCOME_MESSAGE', 'SALON_POLICY'], 'invoicing')}
-                    disabled={savingSection !== null}
+                    disabled={sectionSaving('invoicing')}
                     sx={{ mt: 2, alignSelf: 'flex-start' }}
                   >
                     {savingSection === 'invoicing' ? l.saving : l.saveInvoicingBtn}
@@ -993,7 +1046,7 @@ export default function SettingsPage() {
                     color="info"
                     startIcon={savingSection === 'social' ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
                     onClick={() => void saveKeys(SOCIAL_KEYS, 'social')}
-                    disabled={savingSection !== null}
+                    disabled={sectionSaving('social')}
                     sx={{ mt: 2, alignSelf: 'flex-start' }}
                   >
                     {savingSection === 'social' ? l.saving : l.saveSocialBtn}
@@ -1108,7 +1161,7 @@ export default function SettingsPage() {
                   size="large"
                   startIcon={savingSection === 'hours' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void saveHours()}
-                  disabled={savingSection !== null}
+                  disabled={sectionSaving('hours')}
                   sx={{ mt: 3, px: 3 }}
                 >
                   {savingSection === 'hours' ? l.saving : l.saveHoursBtn}
@@ -1117,23 +1170,33 @@ export default function SettingsPage() {
             </Box>
           )}
 
-          {tab === 2 &&
-            renderSettingFields(LOYALTY_KEYS) && (
-              <>
-                {renderSettingFields(LOYALTY_KEYS)}
-                {isAdmin && (
-                  <Button
-                    variant="contained"
-                    startIcon={savingSection === 'loyalty' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
-                    onClick={() => void saveKeys(LOYALTY_KEYS, 'loyalty')}
-                    disabled={savingSection !== null}
-                    sx={{ mt: 2 }}
-                  >
-                    {savingSection === 'loyalty' ? l.saving : l.save}
-                  </Button>
-                )}
-              </>
-            )}
+          {tab === 2 && (
+            <Box
+              sx={{
+                border: 1.5,
+                borderColor: 'primary.light',
+                borderRadius: 2,
+                p: 2,
+                maxWidth: 620,
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>
+                {l.loyalty}
+              </Typography>
+              {renderSettingFields(LOYALTY_KEYS)}
+              {isAdmin && (
+                <Button
+                  variant="contained"
+                  startIcon={savingSection === 'loyalty' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+                  onClick={() => void saveKeys(LOYALTY_KEYS, 'loyalty')}
+                  disabled={sectionSaving('loyalty')}
+                  sx={{ mt: 2 }}
+                >
+                  {savingSection === 'loyalty' ? l.saving : l.save}
+                </Button>
+              )}
+            </Box>
+          )}
 
           {tab === 3 && (
             <Box sx={{ maxWidth: 760 }}>
@@ -1170,7 +1233,7 @@ export default function SettingsPage() {
                     variant="contained"
                     startIcon={savingSection === 'zatca' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                     onClick={() => void saveKeys(ZATCA_KEYS, 'zatca')}
-                    disabled={savingSection !== null}
+                    disabled={sectionSaving('zatca')}
                     sx={{ mt: 3, alignSelf: 'flex-start' }}
                   >
                     {savingSection === 'zatca' ? l.saving : l.save}
@@ -1331,7 +1394,7 @@ export default function SettingsPage() {
                   color="success"
                   startIcon={savingSection === 'payments' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void saveKeys(PAYMENT_KEYS, 'payments')}
-                  disabled={savingSection !== null}
+                  disabled={sectionSaving('payments')}
                   sx={{ mt: 1 }}
                 >
                   {savingSection === 'payments' ? l.saving : l.save}
@@ -1459,9 +1522,10 @@ export default function SettingsPage() {
                   color="success"
                   startIcon={savingSection === 'whatsapp' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
                   onClick={() => void handleSaveWhatsapp()}
-                  disabled={savingSection !== null}
+                  disabled={sectionSaving('whatsapp')}
+                  sx={{ mt: 2 }}
                 >
-                  {savingSection === 'whatsapp' ? l.saving : l.save}
+                  {savingSection === 'whatsapp' ? l.saving : lang === 'ar' ? 'حفظ إعدادات واتساب' : 'Save WhatsApp Settings'}
                 </Button>
               )}
             </Box>
