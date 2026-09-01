@@ -53,7 +53,7 @@ export default function BookingPage() {
   const [perServiceEmployee, setPerServiceEmployee] = useState<Record<number, number | ''>>({});
 
   const [date, setDate] = useState('');
-  const [slots, setSlots] = useState<{ time: string; availableEmployeeId?: number; availableEmployeeName?: string }[]>([]);
+  const [slots, setSlots] = useState<{ time: string; available?: boolean; availableEmployeeId?: number; availableEmployeeName?: string }[]>([]);
   const [selectedTime, setSelectedTime] = useState('');
 
   const [clientName, setClientName] = useState('');
@@ -500,25 +500,29 @@ export default function BookingPage() {
                     </Box>
                   ) : (
                     <Grid container spacing={1.5}>
-                      {slots.map((slot) => (
+                      {slots.map((slot) => {
+                        const taken = slot.available === false;
+                        return (
                         <Grid item xs={4} sm={3} key={slot.time}>
                           <Button
                             variant={selectedTime === slot.time ? 'contained' : 'outlined'}
+                            disabled={taken}
                             onClick={() => setSelectedTime(slot.time)}
                             sx={{
                               borderRadius: '12px',
                               width: '100%',
                               fontWeight: 700,
                               backgroundColor: selectedTime === slot.time ? '#c2185b' : 'transparent',
-                              color: selectedTime === slot.time ? '#fff' : '#c2185b',
+                              color: taken ? '#94a3b8' : selectedTime === slot.time ? '#fff' : '#c2185b',
                               borderColor: '#f1f5f9',
                             }}
                           >
                             {slot.time}
                           </Button>
                         </Grid>
-                      ))}
-                      {date && slots.length === 0 && (
+                        );
+                      })}
+                      {date && !isDateClosed && slots.length === 0 && (
                         <Grid item xs={12}>
                           <Alert severity="info" sx={{ borderRadius: '12px' }}>
                             {isAr ? 'لا توجد مواعيد متاحة لهذا التاريخ' : 'No available slots for this date'}

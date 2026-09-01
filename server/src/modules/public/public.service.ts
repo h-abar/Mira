@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { ApiError } from '../../utils/ApiError';
 
@@ -42,7 +43,41 @@ const ALL_HOURS_KEYS = [
   ...DAYS.flatMap((d) => [`${d.toUpperCase()}_OPENING`, `${d.toUpperCase()}_CLOSING`]),
   'OPENING_TIME',
   'CLOSING_TIME',
+  'SOCIAL_INSTAGRAM',
+  'SOCIAL_FACEBOOK',
+  'SOCIAL_WHATSAPP',
+  'SOCIAL_SNAPCHAT',
+  'SOCIAL_TIKTOK',
+  'WHATSAPP_PUBLIC_PHONE',
 ];
+
+function normalizeSocialUrl(
+  kind: 'instagram' | 'facebook' | 'whatsapp' | 'snapchat' | 'tiktok',
+  raw: string | undefined,
+): string | null {
+  const v = (raw ?? '').trim();
+  if (!v) return null;
+  if (kind === 'whatsapp') {
+    const digits = v.replace(/[^\d]/g, '');
+    if (digits.length < 8) return null;
+    return `https://wa.me/${digits}`;
+  }
+  if (/^https?:\/\//i.test(v)) return v;
+  const handle = v.replace(/^@/, '').replace(/^\/+/, '');
+  if (!handle) return null;
+  switch (kind) {
+    case 'instagram':
+      return `https://www.instagram.com/${handle}`;
+    case 'facebook':
+      return `https://www.facebook.com/${handle}`;
+    case 'snapchat':
+      return `https://www.snapchat.com/add/${handle}`;
+    case 'tiktok':
+      return `https://www.tiktok.com/@${handle}`;
+    default:
+      return null;
+  }
+}
 
 function parseClosedDays(value: string | undefined): string[] {
   if (!value?.trim()) return [];
@@ -107,6 +142,13 @@ export const publicService = {
       nameEn: map.get('SALON_NAME_EN') || 'Mira',
       hours: buildSchedule(map),
       closedDays: parseClosedDays(map.get('CLOSED_DAYS')),
+      social: {
+        instagram: normalizeSocialUrl('instagram', map.get('SOCIAL_INSTAGRAM')),
+        facebook: normalizeSocialUrl('facebook', map.get('SOCIAL_FACEBOOK')),
+        whatsapp: normalizeSocialUrl('whatsapp', map.get('SOCIAL_WHATSAPP') || map.get('WHATSAPP_PUBLIC_PHONE')),
+        snapchat: normalizeSocialUrl('snapchat', map.get('SOCIAL_SNAPCHAT')),
+        tiktok: normalizeSocialUrl('tiktok', map.get('SOCIAL_TIKTOK')),
+      },
     };
   },
 
@@ -129,7 +171,6 @@ export const publicService = {
     const dayOfWeekNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const currentDayName = dayOfWeekNames[date.getDay()];
 
-    // Fetch candidate employees
     const allEmployees = await prisma.employee.findMany({
       where: {
         isActive: true,
@@ -139,29 +180,16 @@ export const publicService = {
         id: true,
         nameAr: true,
         nameEn: true,
-        shiftStart: true,
-        shiftEnd: true,
-        workDays: true,
       },
     });
 
-    // Filter employees working on this day of week
-    const employees = allEmployees.filter((emp) => {
-      if (!emp.workDays) return true;
-      const days = emp.workDays.split(',').map((d) => d.trim());
-      return days.includes(currentDayName);
-    });
+    const employees = allEmployees;
 
-    if (employees.length === 0) {
-      return [];
-    }
-
-    // Fetch existing appointments on that day
     const existingAppointments = await prisma.appointment.findMany({
       where: {
         date: { gte: dayStart, lte: dayEnd },
         status: { not: 'CANCELLED' },
-        employeeId: { in: employees.map((e) => e.id) },
+        ...(employees.length > 0 ? { employeeId: { in: employees.map((e) => e.id) } } : {}),
       },
       select: {
         employeeId: true,
@@ -183,26 +211,19 @@ export const publicService = {
       return [];
     }
 
-    const slots: { time: string; availableEmployeeId?: number; availableEmployeeName?: string }[] = [];
+    const slots: {
+      time: string;
+      available: boolean;
+      availableEmployeeId?: number;
+      availableEmployeeName?: string;
+    }[] = [];
 
-    // Step every 30 minutes
     for (let current = openingMinutes; current + duration <= closingMinutes; current += 30) {
       const slotStartStr = minutesToTime(current);
-      const slotEndStr = minutesToTime(current + duration);
-
       const slotStart = current;
       const slotEnd = current + duration;
 
-      // Find employees free during this slot and within their shift hours
       const freeEmployees = employees.filter((emp) => {
-        const empShiftStart = emp.shiftStart ? timeToMinutes(emp.shiftStart) : openingMinutes;
-        const empShiftEnd = emp.shiftEnd ? timeToMinutes(emp.shiftEnd) : closingMinutes;
-
-        // Check shift bounds
-        if (slotStart < empShiftStart || slotEnd > empShiftEnd) {
-          return false;
-        }
-
         const empAppointments = existingAppointments.filter((a) => a.employeeId === emp.id);
         const hasConflict = empAppointments.some((app) => {
           const appStart = timeToMinutes(app.startTime);
@@ -212,13 +233,12 @@ export const publicService = {
         return !hasConflict;
       });
 
-      if (freeEmployees.length > 0) {
-        slots.push({
-          time: slotStartStr,
-          availableEmployeeId: freeEmployees[0].id,
-          availableEmployeeName: freeEmployees[0].nameAr,
-        });
-      }
+      slots.push({
+        time: slotStartStr,
+        available: freeEmployees.length > 0,
+        availableEmployeeId: freeEmployees[0]?.id,
+        availableEmployeeName: freeEmployees[0]?.nameAr,
+      });
     }
 
     return slots;
@@ -353,18 +373,9 @@ export const publicService = {
     const dayEnd = endOfDay(date);
     const employees = await prisma.employee.findMany({
       where: { isActive: true },
-      select: { id: true, shiftStart: true, shiftEnd: true, workDays: true },
+      select: { id: true },
     });
-    const dayOfWeekNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const currentDayName = dayOfWeekNames[date.getDay()];
     for (const emp of employees) {
-      if (emp.workDays) {
-        const days = emp.workDays.split(',').map((d) => d.trim());
-        if (!days.includes(currentDayName)) continue;
-      }
-      const empShiftStart = emp.shiftStart ? timeToMinutes(emp.shiftStart) : 0;
-      const empShiftEnd = emp.shiftEnd ? timeToMinutes(emp.shiftEnd) : 1440;
-      if (startMinutes < empShiftStart || endMinutes > empShiftEnd) continue;
       const conflicts = await prisma.appointment.findMany({
         where: {
           employeeId: emp.id,
@@ -381,8 +392,9 @@ export const publicService = {
   },
 
   async getBookingByCode(code: string) {
-    const parts = code.split('-');
-    const id = Number(parts[1]);
+    const raw = code.trim();
+    const parts = raw.split('-');
+    const id = Number(parts.length >= 2 ? parts[1] : parts[0]);
     if (!id || Number.isNaN(id)) {
       throw new ApiError(400, 'رمز الحجز غير صحيح');
     }
@@ -402,7 +414,64 @@ export const publicService = {
 
     return {
       appointment,
-      bookingCode: code,
+      bookingCode: code.startsWith('SLN-') ? code : `SLN-${appointment.id}`,
+    };
+  },
+
+  async searchBookings(query: { code?: string; phone?: string; name?: string }) {
+    const code = query.code?.trim();
+    const phone = query.phone?.trim();
+    const name = query.name?.trim();
+
+    if (code) {
+      const found = await this.getBookingByCode(code);
+      return {
+        bookings: [
+          {
+            bookingCode: found.bookingCode,
+            appointment: found.appointment,
+          },
+        ],
+      };
+    }
+
+    if (!phone && !name) {
+      throw new ApiError(400, 'يرجى إدخال رمز الحجز أو رقم الجوال أو الاسم');
+    }
+
+    const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
+    const clientFilter: Prisma.ClientWhereInput = {};
+    if (name) {
+      clientFilter.name = { contains: name, mode: 'insensitive' };
+    }
+    if (phoneDigits) {
+      const lastNine = phoneDigits.length >= 9 ? phoneDigits.slice(-9) : phoneDigits;
+      clientFilter.OR = [
+        { phone: { contains: lastNine } },
+        { whatsapp: { contains: lastNine } },
+      ];
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where: { client: clientFilter },
+      include: {
+        client: true,
+        service: true,
+        employee: true,
+      },
+      orderBy: [{ date: 'desc' }, { startTime: 'desc' }],
+      take: 20,
+    });
+
+    if (appointments.length === 0) {
+      throw new ApiError(404, 'لم يتم العثور على الحجز');
+    }
+
+    return {
+      bookings: appointments.map((appointment) => ({
+        bookingCode: `SLN-${appointment.id}`,
+        appointment,
+      })),
     };
   },
 };

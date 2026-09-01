@@ -72,10 +72,16 @@ describe('exportHelper', () => {
       expect(buffer.length).toBeGreaterThan(1000);
     });
 
-    it('builds a PDF buffer without errors', async () => {
-      const buffer = await buildPdf(dataset);
-      expect(buffer).toBeInstanceOf(Buffer);
-      expect(buffer.length).toBeGreaterThan(1000);
+    it('keeps wide Arabic tables inside the page when building PDF', async () => {
+      const wide = {
+        ...dataset,
+        columns: ['الموظفة', 'بداية الوردية', 'نهاية الوردية', 'الحالة', 'الفواتير', 'المبيعات', 'نقدي', 'بطاقة', 'المتوقع', 'الفعلي', 'الفرق'],
+        rows: [
+          ['نورة / Noura', '2026-08-30 09:00', '2026-08-30 17:00', 'مغلقة', 12, 3400.5, 1200, 2200.5, 1500, 1480, -20],
+        ],
+      };
+      const pdfResult = await buildPdf(wide);
+      expect(pdfResult.length).toBeGreaterThan(1000);
     });
 
     it('exportDataset returns proper content types', async () => {

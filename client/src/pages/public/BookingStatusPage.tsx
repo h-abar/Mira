@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Container,
@@ -18,34 +18,65 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useTranslation } from 'react-i18next';
 import PublicNavbar from '../../components/public/PublicNavbar';
 import PublicFooter from '../../components/public/PublicFooter';
-import { publicApi, type BookingResponseData } from '../../api/public';
+import { publicApi, type BookingAppointment, type SalonSocial } from '../../api/public';
+
+interface FoundBooking {
+  bookingCode: string;
+  appointment: BookingAppointment;
+}
 
 export default function BookingStatusPage() {
   const { i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
 
   const [bookingCode, setBookingCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [bookingData, setBookingData] = useState<BookingResponseData | null>(null);
+  const [bookings, setBookings] = useState<FoundBooking[]>([]);
+  const [whatsappHref, setWhatsappHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    publicApi
+      .getInfo()
+      .then((res) => {
+        const social = res.data?.social as SalonSocial | undefined;
+        if (social?.whatsapp) setWhatsappHref(social.whatsapp);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingCode.trim()) {
-      setErrorMsg(isAr ? 'يرجى إدخال رمز الحجز' : 'Please enter booking code');
+    if (!bookingCode.trim() && !phone.trim() && !name.trim()) {
+      setErrorMsg(isAr ? 'يرجى إدخال رمز الحجز أو رقم الجوال أو الاسم' : 'Enter booking code, mobile number, or name');
       return;
     }
 
     try {
       setLoading(true);
       setErrorMsg(null);
-      setBookingData(null);
-      const res = await publicApi.getBookingByCode(bookingCode.trim());
-      if (res.data) {
-        setBookingData(res.data);
+      setBookings([]);
+      const res = await publicApi.searchBookings({
+        code: bookingCode.trim() || undefined,
+        phone: phone.trim() || undefined,
+        name: name.trim() || undefined,
+      });
+      const found = res.data?.bookings ?? [];
+      if (found.length === 0) {
+        setErrorMsg(isAr ? 'لم يتم العثور على الحجز' : 'Booking not found');
+        return;
       }
-    } catch (err: any) {
-      setErrorMsg(err?.message || (isAr ? 'لم يتم العثور على الحجز برمز الاستعلام المدخل' : 'Booking not found'));
+      setBookings(
+        found.map((row) => ({
+          bookingCode: row.bookingCode,
+          appointment: (row.appointment ?? row.appointments?.[0]) as BookingAppointment,
+        })).filter((row) => row.appointment),
+      );
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : '';
+      setErrorMsg(message || (isAr ? 'لم يتم العثور على الحجز' : 'Booking not found'));
     } finally {
       setLoading(false);
     }
@@ -55,6 +86,8 @@ export default function BookingStatusPage() {
     switch (status) {
       case 'BOOKED':
         return <Chip label={isAr ? 'مؤكد' : 'Booked'} color="primary" sx={{ fontWeight: 700 }} />;
+      case 'CONFIRMED':
+        return <Chip label={isAr ? 'مؤكد' : 'Confirmed'} color="primary" sx={{ fontWeight: 700 }} />;
       case 'ARRIVED':
         return <Chip label={isAr ? 'وصلت الصالون' : 'Arrived'} color="info" sx={{ fontWeight: 700 }} />;
       case 'DONE':
@@ -64,6 +97,79 @@ export default function BookingStatusPage() {
       default:
         return <Chip label={status} />;
     }
+  };
+
+  const renderBooking = (bookingData: FoundBooking, index: number) => {
+    const appt = bookingData.appointment;
+    return (
+      <Box
+        key={`${bookingData.bookingCode}-${appt.id}-${index}`}
+        sx={{ mt: 4, pt: 3, borderTop: index === 0 ? '1px solid #f1f5f9' : '1px dashed #e2e8f0' }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="subtitle1" fontWeight={800} color="#c2185b">
+            {bookingData.bookingCode}
+          </Typography>
+          {getStatusChip(appt.status)}
+        </Stack>
+
+        <Grid container spacing={2.5}>
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'اسم العميلة' : 'Client Name'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {appt.client.name}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'رقم الهاتف' : 'Phone'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {appt.client.phone}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'الخدمة' : 'Service'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {isAr ? appt.service.nameAr : appt.service.nameEn}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'الخبيرة' : 'Specialist'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {isAr ? appt.employee.nameAr : appt.employee.nameEn}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'التاريخ' : 'Date'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {appt.date.split('T')[0]}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">
+              {isAr ? 'الوقت' : 'Time'}
+            </Typography>
+            <Typography variant="body1" fontWeight={700}>
+              {appt.startTime} – {appt.endTime}
+            </Typography>
+          </Grid>
+        </Grid>
+      </Box>
+    );
   };
 
   return (
@@ -85,16 +191,34 @@ export default function BookingStatusPage() {
             {isAr ? 'الاستعلام عن حالة الحجز' : 'Check Appointment Status'}
           </Typography>
           <Typography variant="body2" textAlign="center" sx={{ color: '#64748b', mb: 4 }}>
-            {isAr ? 'أدخلي كود الحجز المكون من الأحرف والأرقام لتفاصيل موعدكِ' : 'Enter your reference code to view booking details'}
+            {isAr
+              ? 'ابحثي برمز الحجز، رقم الجوال، أو الاسم'
+              : 'Search by booking code, mobile number, or name'}
           </Typography>
 
           <form onSubmit={handleSearch}>
-            <Stack direction="row" spacing={1.5} mb={3}>
+            <Stack spacing={1.5} mb={3}>
               <TextField
                 fullWidth
-                placeholder={isAr ? 'مثال: SLN-104-582' : 'e.g. SLN-104-582'}
+                label={isAr ? 'رمز الحجز' : 'Booking code'}
+                placeholder={isAr ? 'مثال: SLN-104' : 'e.g. SLN-104'}
                 value={bookingCode}
                 onChange={(e) => setBookingCode(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '16px' } }}
+              />
+              <TextField
+                fullWidth
+                label={isAr ? 'رقم الجوال' : 'Mobile number'}
+                placeholder={isAr ? '05xxxxxxxx' : '05xxxxxxxx'}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '16px' } }}
+              />
+              <TextField
+                fullWidth
+                label={isAr ? 'الاسم' : 'Name'}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '16px' } }}
               />
               <Button
@@ -104,7 +228,7 @@ export default function BookingStatusPage() {
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
                 sx={{
                   borderRadius: '16px',
-                  px: 3,
+                  py: 1.3,
                   fontWeight: 700,
                   backgroundColor: '#c2185b',
                   '&:hover': { backgroundColor: '#880e4f' },
@@ -121,85 +245,25 @@ export default function BookingStatusPage() {
             </Alert>
           )}
 
-          {bookingData && bookingData.appointment && (
-            (() => {
-              const appt = bookingData.appointment;
-              return (
-            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #f1f5f9' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="subtitle1" fontWeight={800} color="#c2185b">
-                  {bookingData.bookingCode}
-                </Typography>
-                {getStatusChip(appt.status)}
-              </Stack>
+          {bookings.map((booking, index) => renderBooking(booking, index))}
 
-              <Grid container spacing={2.5}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'اسم العميلة' : 'Client Name'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {appt.client.name}
-                  </Typography>
-                </Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'رقم الهاتف' : 'Phone'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {appt.client.phone}
-                  </Typography>
-                </Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'الخدمة' : 'Service'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {isAr ? appt.service.nameAr : appt.service.nameEn}
-                  </Typography>
-                </Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'الخبيرة' : 'Specialist'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {isAr ? appt.employee.nameAr : appt.employee.nameEn}
-                  </Typography>
-                </Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'التاريخ' : 'Date'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {appt.date.split('T')[0]}
-                  </Typography>
-                </Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    {isAr ? 'الوقت' : 'Time'}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700}>
-                    {appt.startTime} – {appt.endTime}
-                  </Typography>
-                </Grid>
-              </Grid>
-
+          {bookings.length > 0 && (
+            <>
               <Divider sx={{ my: 3 }} />
-
               <Button
                 fullWidth
                 variant="contained"
                 startIcon={<WhatsAppIcon />}
                 component="a"
-                href={`https://wa.me/966500000000?text=${encodeURIComponent(
-                  `استفسار عن حجز برمز: ${bookingData.bookingCode}`,
-                )}`}
+                href={
+                  whatsappHref
+                    ? `${whatsappHref}${whatsappHref.includes('?') ? '&' : '?'}text=${encodeURIComponent(
+                        `استفسار عن حجز برمز: ${bookings[0].bookingCode}`,
+                      )}`
+                    : `https://wa.me/?text=${encodeURIComponent(`استفسار عن حجز برمز: ${bookings[0].bookingCode}`)}`
+                }
                 target="_blank"
+                rel="noopener noreferrer"
                 sx={{
                   borderRadius: '16px',
                   py: 1.2,
@@ -210,9 +274,7 @@ export default function BookingStatusPage() {
               >
                 {isAr ? 'مراسلة الاستقبال عبر WhatsApp' : 'Contact Reception'}
               </Button>
-            </Box>
-              );
-            })()
+            </>
           )}
         </Paper>
       </Container>

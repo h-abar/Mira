@@ -185,7 +185,8 @@ export async function buildExcel(dataset: ExportDataset): Promise<Buffer> {
 
 export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 36 });
+    const landscape = dataset.columns.length >= 6;
+    const doc = new PDFDocument({ size: 'A4', layout: landscape ? 'landscape' : 'portrait', margin: 36 });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -298,30 +299,28 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
     const totalWeight = colWeights.reduce((a, b) => a + b, 0);
     const colWidths = colWeights.map((w) => (w / totalWeight) * pageWidth);
 
-    // Calculate column X positions
-    const colOffsets: number[] = [];
-    let currentX = margin;
-    for (let i = 0; i < numCols; i++) {
-      colOffsets.push(currentX);
-      currentX += colWidths[i];
-    }
-
     const pad = 4;
-    const minRowH = 20;
+    const minRowH = 22;
+    const maxRowH = 48;
 
     const cellText = (cell: string | number): string =>
       typeof cell === 'number' ? fmtNumber(cell) : String(cell ?? '—');
 
+    const visualOrder = <T,>(items: T[]): T[] => (isAr ? [...items].reverse() : items);
+
     const measureRow = (cells: (string | number)[], bold: boolean): number => {
       setFont(bold);
-      doc.fontSize(bold ? 8.5 : 8);
+      doc.fontSize(bold ? 8 : 7.5);
+      const visCells = visualOrder(cells);
+      const visWidths = visualOrder(colWidths);
       let maxH = minRowH;
-      cells.forEach((cell, cIdx) => {
+      visCells.forEach((cell, cIdx) => {
         const text = cellText(cell);
         const hasArabic = containsArabic(text);
         const rtlOpt = hasArabic ? { features: ['rtla'] } : {};
-        const cellH = doc.heightOfString(text, { width: colWidths[cIdx] - pad * 2, ...rtlOpt });
-        maxH = Math.max(maxH, cellH + 6);
+        const innerW = Math.max(8, visWidths[cIdx] - pad * 2);
+        const cellH = doc.heightOfString(text, { width: innerW, ...rtlOpt });
+        maxH = Math.max(maxH, Math.min(maxRowH, cellH + 8));
       });
       return maxH;
     };
@@ -336,39 +335,48 @@ export function buildPdf(dataset: ExportDataset): Promise<Buffer> {
       if (bg) {
         doc.rect(margin, rowY, pageWidth, rowH).fill(bg);
       }
-      // Light border underneath
-      doc.rect(margin, rowY + rowH - 0.5, pageWidth, 0.5).fill('#e0d5db');
 
-      setFont(bold);
-      doc.fontSize(bold ? 8.5 : 8);
-      doc.fillColor(bold ? '#ffffff' : '#222222');
+      const visCells = visualOrder(cells);
+      const visWidths = visualOrder(colWidths);
+      let x = margin;
 
-      cells.forEach((cell, cIdx) => {
-        // In Arabic layout, columns order from right to left across the page
-        const visualColIdx = isAr ? numCols - 1 - cIdx : cIdx;
-        const x = colOffsets[visualColIdx];
-        const width = colWidths[cIdx];
+      visCells.forEach((cell, cIdx) => {
+        const width = visWidths[cIdx];
         const text = cellText(cell);
         const isNum = typeof cell === 'number';
         const hasArabic = containsArabic(text);
-
-        // Crucial fix: DO NOT apply { features: ['rtla'] } to pure numbers, codes, or dates!
         const rtlOption = hasArabic ? { features: ['rtla'] } : {};
         const alignOption: 'center' | 'left' | 'right' = bold
           ? 'center'
           : isNum
-          ? 'right'
-          : hasArabic
-          ? (isAr ? 'right' : 'left')
-          : 'center';
+            ? (isAr ? 'left' : 'right')
+            : hasArabic
+              ? (isAr ? 'right' : 'left')
+              : 'center';
 
-        const cellH = doc.heightOfString(text, { width: width - pad * 2, ...rtlOption });
-        doc.text(text, x + pad, rowY + (rowH - cellH) / 2, {
-          width: width - pad * 2,
+        doc.save();
+        doc.rect(x, rowY, width, rowH).clip();
+        setFont(bold);
+        doc.fontSize(bold ? 8 : 7.5);
+        doc.fillColor(bold ? '#ffffff' : '#222222');
+        doc.text(text, x + pad, rowY + 4, {
+          width: Math.max(8, width - pad * 2),
+          height: Math.max(10, rowH - 8),
           align: alignOption,
+          ellipsis: true,
+          lineBreak: true,
           ...rtlOption,
         });
+        doc.restore();
+
+        doc.lineWidth(0.4).strokeColor('#d7c7ce');
+        doc.rect(x, rowY, width, rowH).stroke();
+        x += width;
       });
+
+      // Keep PDFKit's flowing cursor from leaking into the next row.
+      doc.x = margin;
+      doc.y = rowY + rowH;
     };
 
     const headerH = measureRow(dataset.columns, true);

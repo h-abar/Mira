@@ -23,15 +23,25 @@ export interface DayHours {
   closing: string;
 }
 
+export interface SalonSocial {
+  instagram: string | null;
+  facebook: string | null;
+  whatsapp: string | null;
+  snapchat: string | null;
+  tiktok: string | null;
+}
+
 export interface SalonInfo {
   nameAr: string;
   nameEn: string;
   hours: DayHours[];
   closedDays: string[];
+  social?: SalonSocial;
 }
 
 export interface TimeSlot {
   time: string;
+  available?: boolean;
   availableEmployeeId?: number;
   availableEmployeeName?: string;
 }
@@ -98,4 +108,9 @@ export const publicApi = {
 
   getBookingByCode: (code: string) =>
     api.get<{ success: boolean; data: BookingResponseData }>(`/public/booking/${code}`),
+
+  searchBookings: (params: { code?: string; phone?: string; name?: string }) =>
+    api.get<{ success: boolean; data: { bookings: BookingResponseData[] } }>('/public/booking-search', {
+      params,
+    }),
 };

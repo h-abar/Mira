@@ -1,14 +1,12 @@
-import { Box, Container, Grid, Typography, Stack, IconButton, Divider } from '@mui/material';
+import { Box, Container, Grid, Typography, Stack, Divider } from '@mui/material';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import PhoneIcon from '@mui/icons-material/Phone';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import FacebookIcon from '@mui/icons-material/Facebook';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { publicApi, type SalonInfo } from '../../api/public';
+import SocialLinks from './SocialLinks';
 
 const DAY_AR: Record<string, string> = {
   Sat: 'السبت',
@@ -34,6 +32,7 @@ export default function PublicFooter() {
   const isAr = i18n.language === 'ar';
 
   const [groups, setGroups] = useState<{ label: string; range: string }[]>([]);
+  const [salonInfo, setSalonInfo] = useState<SalonInfo | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -52,6 +51,7 @@ export default function PublicFooter() {
       .then((res) => {
         if (!active || !res.data) return;
         const info: SalonInfo = res.data;
+        setSalonInfo(info);
         const closedSet = new Set(info.closedDays ?? []);
         const schedule = info.hours ?? [];
         const keyOf = (day: string, opening: string, closing: string) =>
@@ -122,32 +122,7 @@ export default function PublicFooter() {
                 ? 'صالون ميرا للتجميل والعناية المتكاملة بالأناقة والجمال. نمنحكِ تجربة استثنائية من الاسترخاء والجاذبية بأيدي أمهر الخبيرات في عالم التجميل.'
                 : 'Mira Salon offers top-tier beauty and luxury pampering services tailored to highlight your radiance and inner elegance.'}
             </Typography>
-            <Stack direction="row" spacing={1}>
-              <IconButton
-                component="a"
-                href="https://instagram.com"
-                target="_blank"
-                sx={{ background: 'rgba(255, 255, 255, 0.06)', color: '#e91e63', '&:hover': { background: '#c2185b', color: '#fff' } }}
-              >
-                <InstagramIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                component="a"
-                href="https://wa.me/966500000000"
-                target="_blank"
-                sx={{ background: 'rgba(255, 255, 255, 0.06)', color: '#25D366', '&:hover': { background: '#25D366', color: '#fff' } }}
-              >
-                <WhatsAppIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                component="a"
-                href="https://facebook.com"
-                target="_blank"
-                sx={{ background: 'rgba(255, 255, 255, 0.06)', color: '#3b5998', '&:hover': { background: '#3b5998', color: '#fff' } }}
-              >
-                <FacebookIcon fontSize="small" />
-              </IconButton>
-            </Stack>
+            <SocialLinks social={salonInfo?.social} variant="dark" isAr={isAr} />
           </Grid>
 
           {/* Quick Links */}

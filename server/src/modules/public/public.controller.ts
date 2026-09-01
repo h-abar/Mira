@@ -83,6 +83,22 @@ export const publicController = {
     }
   },
 
+  async searchBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = z
+        .object({
+          code: z.string().optional(),
+          phone: z.string().optional(),
+          name: z.string().optional(),
+        })
+        .parse(req.query);
+      const data = await publicService.searchBookings(parsed);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getBookingByCode(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const code = String(req.params.code);

@@ -30,6 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PublicNavbar from '../../components/public/PublicNavbar';
 import PublicFooter from '../../components/public/PublicFooter';
+import SocialLinks from '../../components/public/SocialLinks';
 import { publicApi, type ServiceItem, type EmployeeItem, type SalonInfo } from '../../api/public';
 
 export default function LandingPage() {
@@ -263,6 +264,9 @@ export default function LandingPage() {
                   {isAr ? 'استكشاف الخدمات والأسعار' : 'View Services & Rates'}
                 </Button>
               </Stack>
+              <Box sx={{ mt: 3 }}>
+                <SocialLinks social={salonInfo?.social} variant="dark" isAr={isAr} />
+              </Box>
             </Grid>
 
             {/* Visual Hero Banner */}

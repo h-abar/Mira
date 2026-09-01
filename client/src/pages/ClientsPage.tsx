@@ -37,6 +37,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LoyaltyIcon from '@mui/icons-material/Loyalty';
+import PhoneIcon from '@mui/icons-material/Phone';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   listClients,
   getClient,
@@ -643,6 +645,34 @@ export default function ClientsPage() {
               <Typography variant="h5" gutterBottom>
                 {profile.name}
               </Typography>
+              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                {profile.phone && (
+                  <Tooltip title={labels.phone}>
+                    <IconButton
+                      component="a"
+                      href={`tel:${profile.phone}`}
+                      color="primary"
+                      aria-label={labels.phone}
+                    >
+                      <PhoneIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {(profile.whatsapp || profile.phone) && (
+                  <Tooltip title={labels.whatsapp}>
+                    <IconButton
+                      component="a"
+                      href={`https://wa.me/${String(profile.whatsapp || profile.phone).replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ color: '#25D366' }}
+                      aria-label={labels.whatsapp}
+                    >
+                      <WhatsAppIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
               {profile.phone && (
                 <Typography color="text.secondary">
                   {labels.phone}: {profile.phone}
